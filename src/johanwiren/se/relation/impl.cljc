@@ -1,10 +1,12 @@
 (ns johanwiren.se.relation.impl
-  (:refer-clojure :exclude [set seq]))
+  (:require [clojure.core :as core])
+  (:refer-clojure :exclude [set seq count]))
 
 (defprotocol RelationP
   (set [rel])
   (compose [rel xform])
-  (entries [rel]))
+  (entries [rel])
+  (count [rel]))
 
 (deftype Relation [xform rel]
   #?(:clj clojure.lang.Seqable
@@ -18,6 +20,9 @@
 
   (compose [_ xform']
     (Relation. (comp xform xform') rel))
+
+  (count [_]
+    (core/count rel))
 
   (entries [_]
     (sequence xform rel)))

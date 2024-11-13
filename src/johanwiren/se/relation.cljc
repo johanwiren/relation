@@ -129,7 +129,11 @@
 (defn join
   "Joins relation yrel using the corresponding attributes in kmap. "
   [xrel yrel kmap]
-  (compose xrel (join* (relation yrel) kmap)))
+  (let [yrel (relation yrel)]
+    ;; Naive way to find which relation to index
+    (if (<= (impl/count xrel) (impl/count yrel))
+      (compose yrel (join* xrel (set/map-invert kmap)))
+      (compose xrel (join* yrel kmap)))))
 
 (defn- left-join* [yrel km]
   (fn [rf]
