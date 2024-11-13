@@ -1,6 +1,7 @@
 (ns johanwiren.se.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.se.relation :as r :refer [|>]]))
+            [johanwiren.se.relation :as r :refer [|>]])
+  #?(:cljs (:require-macros johanwiren.se.relation)))
 
 (def artist #{{:artist/name "Bruce Dickinson" :artist/band-name "Iron Maiden"}
               {:artist/name "Nicko McBrain" :artist/band-name "Iron Maiden"}
@@ -198,40 +199,43 @@
              (r/seq rel))))))
 
 (deftest aggregate-by-test
-  (testing "It aggregates"
-    (is (= #{#:song{:album-name "Iron Maiden",
-                    :avg-length 2259/8,
-                    :max-length 422}
-             #:song{:album-name "The Number of the Beast",
-                    :avg-length 2351/8,
-                    :max-length 428}}
-           (|> (r/relation song)
-               (r/aggregate-by :song/album-name {:song/avg-length [r/avg-agg :song/length]
-                                                 :song/max-length [max :song/length]}))))))
+  #?(:clj
+     (testing "It aggregates"
+       (is (= #{#:song{:album-name "Iron Maiden",
+                       :avg-length 2259/8,
+                       :max-length 422}
+                #:song{:album-name "The Number of the Beast",
+                       :avg-length 2351/8,
+                       :max-length 428}}
+              (|> (r/relation song)
+                  (r/aggregate-by :song/album-name {:song/avg-length [r/avg-agg :song/length]
+                                                    :song/max-length [max :song/length]})))))))
 
 (deftest aggregate-over-test
-  (testing "It joins aggregates"
-    (is (= #{#:song{:album-name "Iron Maiden", :avg-length 2259/8}
-             #:song{:album-name "The Number of the Beast", :avg-length 2351/8}}
-           (|> (r/relation song)
-               (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
-               (r/project [:song/album-name :song/avg-length]))))))
+  #?(:clj
+     (testing "It joins aggregates"
+       (is (= #{#:song{:album-name "Iron Maiden", :avg-length 2259/8}
+                #:song{:album-name "The Number of the Beast", :avg-length 2351/8}}
+              (|> (r/relation song)
+                  (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
+                  (r/project [:song/album-name :song/avg-length])))))))
 
 (deftest usecase-test
-  (testing "Find the songs on each album longer than the average for that album"
-    (is (= #{#:song{:name "22 Acacia Avenue"}
-             #:song{:name "Strange World"}
-             #:song{:name "Remember Tomorrow"}
-             #:song{:name "The Prisoner"}
-             #:song{:name "Hallowed Be Thy Name"}
-             #:song{:name "Phantom Of the Opera"}}
-           (|> (r/relation song)
-               (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
-               (r/extend :song/longer-than-avg?
-                 (fn [{:song/keys [length avg-length]}]
-                   (< avg-length length)))
-               (r/select :song/longer-than-avg?)
-               (r/project [:song/name]))))))
+  #?(:clj
+     (testing "Find the songs on each album longer than the average for that album"
+       (is (= #{#:song{:name "22 Acacia Avenue"}
+                #:song{:name "Strange World"}
+                #:song{:name "Remember Tomorrow"}
+                #:song{:name "The Prisoner"}
+                #:song{:name "Hallowed Be Thy Name"}
+                #:song{:name "Phantom Of the Opera"}}
+              (|> (r/relation song)
+                  (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
+                  (r/extend :song/longer-than-avg?
+                    (fn [{:song/keys [length avg-length]}]
+                      (< avg-length length)))
+                  (r/select :song/longer-than-avg?)
+                  (r/project [:song/name])))))))
 
 (deftest normalize
   (testing "It normalizes"

@@ -7,27 +7,31 @@
 
   To realise a the composed process, use either set or seq"
   (:require
-   [clojure.core :as core]
+   #?(:clj [clojure.core :as core]
+      :cljs [cljs.core :as core])
    [clojure.set :as set]
    [johanwiren.se.relation.impl :as impl])
-  (:import johanwiren.se.relation.impl.Relation)
   (:refer-clojure :exclude [assoc dissoc set seq update extend update sort-by]))
 
 (defmacro |>
   "Convenience threading macro similar to -> that realises into a set."
   {:clj-kondo/lint-as 'clojure.core/->}
   [& forms]
-  `(core/set (-> ~@forms)))
+  `(impl/set (-> ~@forms)))
+
+(defn relation? [x]
+  (impl/relation? x))
 
 (defn relation
   "Creates a relation.
   rel should be a set/sequence of maps."
   [rel]
   (cond
-    (instance? Relation rel)
+    (relation? rel)
     rel
 
-    (empty? rel)
+    (and (seqable? rel)
+         (empty? rel))
     (impl/->Relation identity #{})
 
     (and (set? rel)
@@ -42,13 +46,10 @@
     (throw (#?(:clj IllegalArgumentException. :cljs js/Error.)
             "Relations must be a set/seq of maps"))))
 
-(defmethod core/print-method Relation [rel writer]
-  (core/print-method (impl/set rel) writer))
-
 (defn seq
   "Realises into a (distinct) sequence."
   [rel]
-  (core/seq rel))
+  (impl/seq rel))
 
 (defn set
   "Realises into a set."

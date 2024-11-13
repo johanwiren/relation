@@ -1,28 +1,31 @@
 (ns johanwiren.se.relation.impl
-  (:require [clojure.core :as core])
-  (:refer-clojure :exclude [set seq count]))
+  #?(:clj (:require [clojure.core :as core])
+     :cljs (:require [cljs.core :as core]))
+  (:refer-clojure :exclude [keys set seq count]))
 
-(defprotocol RelationP
-  (set [rel])
-  (compose [rel xform])
-  (entries [rel])
-  (count [rel]))
+(deftype Relation [xform rel])
 
-(deftype Relation [xform rel]
-  #?(:clj clojure.lang.Seqable
-     :cljs ISeqable)
-  (seq [_]
-    (sequence (comp xform (distinct)) rel))
+(defn seq [rel]
+  (sequence (comp (.-xform rel)
+                  (distinct))
+            (.-rel rel)))
 
-  RelationP
-  (set [_]
-    (into (empty rel) xform rel))
+(defn set [rel]
+  (into (empty (.-rel rel))
+        (.-xform rel)
+        (.-rel rel)))
 
-  (compose [_ xform']
-    (Relation. (comp xform xform') rel))
+(defn compose [rel xform]
+  (->Relation (comp (.-xform rel) xform) (.-rel rel)))
 
-  (count [_]
-    (core/count rel))
+(defn entries [rel]
+  (sequence (.-xform rel) (.-rel rel)))
 
-  (entries [_]
-    (sequence xform rel)))
+(defn count [rel]
+  (core/count (.-rel rel)))
+
+(defn keys [rel]
+  (core/keys (first (.-rel rel))))
+
+(defn relation? [x]
+  (instance? Relation x))
