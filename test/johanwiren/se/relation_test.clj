@@ -163,6 +163,22 @@
                (r/left-join (r/relation song) {:artist/band-name :song/band-name})
                (r/project [:artist/band-name]))))))
 
+(deftest right-join-test
+  (testing "It joins rows"
+    (is (= #{{:artist/band-name "Iron Maiden",
+              :song/album-name "The Number of the Beast"}
+             #:artist{:band-name "The White Stripes"}
+             {:artist/band-name "Iron Maiden", :song/album-name "Iron Maiden"}}
+           (|> (r/relation song)
+               (r/right-join (r/relation artist) {:song/band-name :artist/band-name})
+               (r/project [:artist/band-name :song/album-name])))))
+  (testing "It keeps unmatched right rows"
+    (is (= #{#:artist{:band-name "Iron Maiden"}
+             #:artist{:band-name "The White Stripes"}}
+           (|> (r/relation song)
+               (r/right-join (r/relation artist) {:song/band-name :artist/band-name})
+               (r/project [:artist/band-name]))))))
+
 (deftest sort-by-test
   (testing "It sorts"
     (let [rel (-> (r/relation artist)
@@ -230,3 +246,33 @@
            (-> (r/relation #{{:a/key :val}})
                (r/union (r/relation #{{:b/key :val}}))
                r/normalize)))))
+
+
+(comment
+
+  (let [n 10000]
+    (print "relation")
+    (time
+     (dotimes [_ n]
+       (|> (r/relation song)
+           (r/join (r/relation artist) {:song/band-name :artist/band-name})
+           (r/project [:artist/band-name])
+           (r/join (r/relation song) {:artist/band-name :song/band-name}))
+       nil))
+
+    (print "clojure.set")
+    (time
+     (dotimes [_ n]
+       (-> song
+           (clojure.set/join artist {:song/band-name :artist/band-name})
+           (clojure.set/project [:artist/band-name])
+           (clojure.set/join song {:artist/band-name :song/band-name}))
+       nil)))
+
+  (|> (r/relation song)
+      (r/join (r/relation artist) {:song/band-name :artist/band-name})
+      (r/aggregate-over :song/album-name {:album/length [+ :song/length]
+                                          :album/artists [r/set-agg :artist/name]}))
+
+
+  nil)

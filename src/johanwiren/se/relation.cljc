@@ -114,14 +114,14 @@
    persistent!
    (update-vals persistent!)))
 
-(defn- join* [yrel km]
+(defn- join* [yrel kmap]
   (fn [rf]
-    (let [idx (index yrel (vals km))]
+    (let [idx (index yrel (vals kmap))]
       (fn
         ([] (rf))
         ([res] (rf res))
         ([res item]
-         (let [found (get idx (set/rename-keys (select-keys item (keys km)) km))]
+         (let [found (get idx (set/rename-keys (select-keys item (keys kmap)) kmap))]
            (if found
              (reduce rf res (map #(merge item %) found))
              res)))))))
@@ -130,27 +130,32 @@
   "Joins relation yrel using the corresponding attributes in kmap. "
   [xrel yrel kmap]
   (let [yrel (relation yrel)]
-    ;; Naive way to find which relation to index
-    (if (<= (impl/count xrel) (impl/count yrel))
+    (if (<= (count (impl/keys xrel)) (count (impl/keys yrel)))
       (compose yrel (join* xrel (set/map-invert kmap)))
       (compose xrel (join* yrel kmap)))))
 
-(defn- left-join* [yrel km]
+(defn- left-join* [yrel kmap]
   (fn [rf]
-    (let [idx (index yrel (vals km))]
+    (let [idx (index yrel (vals kmap))]
       (fn
         ([] (rf))
         ([res] (rf res))
         ([res item]
-         (let [found (get idx (set/rename-keys (select-keys item (keys km)) km))]
+         (let [found (get idx (set/rename-keys (select-keys item (keys kmap)) kmap))]
            (if found
              (reduce rf res (map #(merge item %) found))
              (rf res item))))))))
 
 (defn left-join
   "Same as join but always keeps all rows in xrel"
-  [xrel yrel km]
-  (compose xrel (left-join* (relation yrel) km)))
+  [xrel yrel kmap]
+  (compose xrel (left-join* (relation yrel) kmap)))
+
+(defn right-join
+  "Same as join but always keep all rows in yrel"
+  [xrel yrel kmap]
+  (let [yrel (relation yrel)]
+    (compose yrel (left-join* xrel (set/map-invert kmap)))))
 
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
