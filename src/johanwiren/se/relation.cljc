@@ -1,0 +1,268 @@
+(ns johanwiren.se.relation
+  "(Somewhat) composeable Relational algebra operations.
+
+  A relation that can be threaded through most operations in this
+  namespace which composes a transducing process that often yields
+  better perfomance than using the corresponding functions in clojure.set
+
+  To realise a the composed process, use either set or seq"
+  (:require
+   [clojure.core :as core]
+   [clojure.set :as set]
+   [johanwiren.se.relation.impl :as impl])
+  (:import johanwiren.se.relation.impl.Relation)
+  (:refer-clojure :exclude [assoc dissoc set seq update extend update sort-by]))
+
+(defmacro |>
+  "Convenience threading macro similar to -> that realises into a set."
+  {:clj-kondo/lint-as 'clojure.core/->}
+  [& forms]
+  `(core/set (-> ~@forms)))
+
+(defn relation
+  "Creates a relation.
+  rel should be a set/sequence of maps."
+  [rel]
+  (cond
+    (instance? Relation rel)
+    rel
+
+    (empty? rel)
+    (impl/->Relation identity #{})
+
+    (and (set? rel)
+         (map? (first rel)))
+    (impl/->Relation identity rel)
+
+    (and (seqable? rel)
+         (map? (first rel)))
+    (impl/->Relation identity (core/set rel))
+
+    :else
+    (throw (#?(:clj IllegalArgumentException. :cljs js/Error.)
+            "Relations must be a set/seq of maps"))))
+
+(defmethod core/print-method Relation [rel writer]
+  (core/print-method (impl/set rel) writer))
+
+(defn seq
+  "Realises into a (distinct) sequence."
+  [rel]
+  (impl/seq rel))
+
+(defn set
+  "Realises into a set."
+  [rel]
+  (impl/set rel))
+
+(defn compose [rel xform]
+  (impl/compose rel xform))
+
+(defn select
+  "Selects rows for which (pred row) returns true."
+  [rel pred]
+  (compose rel (filter pred)))
+
+(defn assoc
+  "Associates key(s) and val(s) to all rows."
+  [rel key val & kvs]
+  (compose rel (map #(apply core/assoc % key val kvs))))
+
+(defn dissoc
+  "Disassociates key(s) from all rows."
+  [rel key & keys]
+  (compose rel (map #(apply core/dissoc % key keys))))
+
+(defn rename
+  "Renames keys on all rows using kmap."
+  [rel kmap]
+  (compose rel (map #(set/rename-keys % kmap))))
+
+(defn extend
+  "Associates k to each row with the value of (f row)"
+  ([rel kmap]
+   (compose rel (map #(reduce-kv (fn [tuple k f]
+                                   (core/assoc tuple k (f tuple)))
+                                 %
+                                 kmap))))
+  ([rel k f]
+   (compose rel (map #(core/assoc % k (f %)))))
+  ([rel k f & kfs]
+   (extend rel (apply hash-map k f kfs))))
+
+(defn update
+  "Updates k in each row with the rusult of applying f to the old value."
+  [rel k f & args]
+  (compose rel (map #(apply core/update % k f args))))
+
+(defn project
+  "Keeps only keys ks for each row"
+  [rel ks]
+  (compose rel (map #(select-keys % ks))))
+
+(defn index
+  "Returns a map of distinct values for ks to distinct rows for those values.
+
+  Realises rel."
+  [rel ks]
+  (->
+   (reduce (fn [acc x]
+             (let [idx-key (select-keys x ks)]
+               (core/assoc! acc idx-key (conj! (get acc idx-key (transient #{})) x))))
+           (transient {})
+           (impl/entries rel))
+   persistent!
+   (update-vals persistent!)))
+
+(defn- join* [yrel km]
+  (fn [rf]
+    (let [idx (index yrel (vals km))]
+      (fn
+        ([] (rf))
+        ([res] (rf res))
+        ([res item]
+         (let [found (get idx (set/rename-keys (select-keys item (keys km)) km))]
+           (if found
+             (reduce rf res (map #(merge item %) found))
+             res)))))))
+
+(defn join
+  "Joins relation yrel using the corresponding attributes in kmap. "
+  [xrel yrel kmap]
+  (compose xrel (join* (relation yrel) kmap)))
+
+(defn- left-join* [yrel km]
+  (fn [rf]
+    (let [idx (index yrel (vals km))]
+      (fn
+        ([] (rf))
+        ([res] (rf res))
+        ([res item]
+         (let [found (get idx (set/rename-keys (select-keys item (keys km)) km))]
+           (if found
+             (reduce rf res (map #(merge item %) found))
+             (rf res item))))))))
+
+(defn left-join
+  "Same as join but always keeps all rows in xrel"
+  [xrel yrel km]
+  (compose xrel (left-join* (relation yrel) km)))
+
+(defn aggregate-by
+  "Returns an aggregated relation grouped by ks using aggs-map.
+  aggs-map should be a map from key to a vector of agg-fn, key-fn.
+  agg-fn must be a reducing function.
+
+  Example: (aggregate-by rel [:album/name] {:album/length [+ :song/length]})"
+  ([rel ks aggs-map]
+   (->>
+    (index rel (if (keyword? ks) [ks] ks))
+    (map (fn [[idx-key rel]]
+           (->>
+            aggs-map
+            (reduce-kv
+             (fn [aggs agg-k [f k]]
+               (reduce (fn [aggs t]
+                         (let [cur (get aggs agg-k)
+                               new (if cur
+                                     (f cur (k t))
+                                     (f (k t)))]
+                           (core/assoc aggs agg-k new)))
+                       aggs
+                       rel))
+             {})
+            (into idx-key))))
+    relation))
+  ([rel ks key agg & more]
+   (aggregate-by rel ks (apply hash-map key agg more))))
+
+(defn aggregate-over
+  "Returns a relation with aggregations joined into rel.
+  See aggregate-by"
+  ([rel ks aggs-map]
+   (join rel
+         (aggregate-by rel ks aggs-map)
+         (into {} (map #(vector % %) (if (keyword? ks) [ks] ks)))))
+  ([rel ks key agg & more]
+   (aggregate-over rel ks (apply hash-map key agg more))))
+
+(defn aggregate
+  "Returns an aggregated relation.
+  aggs-map should be a map from key to a vector of agg-fn, key-fn.
+  agg-fn must be a reducing function.
+
+  Example: (aggregate-by rel {:album/length [+ :song/length]})"
+  ([rel aggs-map]
+   (aggregate-by rel [] aggs-map))
+  ([rel key agg & more]
+   (aggregate-by rel [] (apply hash-map key agg more))))
+
+(defn sort-by [rel keyfn]
+  (relation (into (sorted-set-by #(compare (keyfn %1) (keyfn %2))) (impl/entries rel))))
+
+(defn normalize
+  "Normalizes a relation.
+  Returns a map of namespace to distinct maps with keys for only that namespace.
+
+  Realises rel."
+  [rel]
+  (let [rel (impl/set rel)
+        kmap (core/group-by (comp keyword namespace) (keys (first rel)))]
+    (->> rel
+         seq
+         (reduce (fn [relmap rel]
+                   (reduce-kv (fn [relmap relvar ks]
+                                (core/assoc! relmap
+                                             relvar
+                                             (conj (get relmap relvar #{})
+                                                   (select-keys rel ks))))
+                              relmap
+                              kmap))
+                 (transient {}))
+         (persistent!))))
+
+(defn union
+  "Returns a relation that is the union of xrel and yrel."
+  [xrel yrel]
+  (relation (into (impl/set yrel) (impl/entries xrel))))
+
+(defn difference
+  "Returns a relation that is xrel without the elemens in yrel."
+  [xrel yrel]
+  (compose xrel (remove (impl/set yrel))))
+
+(defn intersection
+  "Returns a relation that is the intersection of xrel and yrel."
+  [xrel yrel]
+  (compose xrel (filter (impl/set yrel))))
+
+#?(:clj
+   (defn avg-agg
+     "Average aggregation function.
+
+  Returns the average as a ratio"
+     ([x]
+      (clojure.lang.Ratio. (biginteger x) (biginteger 1)))
+     ([x y]
+      (clojure.lang.Ratio. (biginteger (+ (numerator x) y))
+                           (biginteger (inc (denominator x)))))))
+
+(defn vec-agg
+  "Vector aggregation function.
+
+  Collects all values into a vector."
+  ([x] (vector x))
+  ([x y] (conj x y)))
+
+(defn set-agg
+  "Set aggregation function.
+
+  Collects all values into a set."
+  ([x] (hash-set x))
+  ([x y] (conj x y)))
+
+(def count-agg
+  "Count aggregation function
+
+  Returns the rowcount."
+  [+ (constantly 1)])
