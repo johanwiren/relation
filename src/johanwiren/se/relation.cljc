@@ -207,6 +207,7 @@
   Realises rel."
   [rel]
   (->> rel
+       impl/entries
        (reduce (fn [{:keys [relmap ks kmap]} rel]
                  (let [rel-keys (keys rel)
                        update-ks? (not-every? ks rel-keys)
