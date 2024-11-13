@@ -97,7 +97,7 @@
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"
-    (is (= #{{:album/length 2259}}
+    (is (= #{#:album{:length 4610, :max-song-length 428}}
            (|> (r/relation song)
                (r/aggregate {:album/length [+ :song/length]
                              :album/max-song-length [max :song/length]}))))))
