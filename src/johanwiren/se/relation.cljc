@@ -206,20 +206,32 @@
 
   Realises rel."
   [rel]
-  (let [rel (impl/set rel)
-        kmap (core/group-by (comp keyword namespace) (keys (first rel)))]
-    (->> rel
-         seq
-         (reduce (fn [relmap rel]
-                   (reduce-kv (fn [relmap relvar ks]
-                                (core/assoc! relmap
-                                             relvar
-                                             (conj (get relmap relvar #{})
-                                                   (select-keys rel ks))))
-                              relmap
-                              kmap))
-                 (transient {}))
-         (persistent!))))
+  (->> rel
+       (reduce (fn [{:keys [relmap ks kmap]} rel]
+                 (let [rel-keys (keys rel)
+                       update-ks? (not-every? ks rel-keys)
+                       ks (if update-ks? (into ks (keys rel)) ks)
+                       kmap (if update-ks?
+                              (core/group-by (comp keyword namespace) ks)
+                              kmap)]
+                   {:kmap kmap
+                    :ks ks
+                    :relmap
+                    (reduce-kv (fn [relmap relvar ks]
+                                 (let [selected (select-keys rel ks)]
+                                   (if (core/seq selected)
+                                     (core/assoc! relmap
+                                                  relvar
+                                                  (conj (get relmap relvar #{})
+                                                        selected))
+                                     relmap)))
+                               relmap
+                               kmap)}))
+               {:kmap {}
+                :ks #{}
+                :relmap (transient {})})
+       :relmap
+       (persistent!)))
 
 (defn union
   "Returns a relation that is the union of xrel and yrel."

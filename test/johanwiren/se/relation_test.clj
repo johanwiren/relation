@@ -144,3 +144,17 @@
     (is (= #{#:song{:album-name "Iron Maiden", :avg-length 2259/8}}
            (|> (r/relation song)
                (r/aggregate-by :song/album-name {:song/avg-length [r/avg-agg :song/length]}))))))
+
+(deftest normalize
+  (testing "It normalizes"
+    (is (= {:song song
+            :artist artist}
+           (-> (r/relation song)
+               (r/join (r/relation artist) {})
+               r/normalize))))
+  (testing "With missing attributes"
+    (is (= {:a #{{:a/key :val}}
+            :b #{{:b/key :val}}}
+           (-> (r/relation #{{:a/key :val}})
+               (r/union (r/relation #{{:b/key :val}}))
+               r/normalize)))))
