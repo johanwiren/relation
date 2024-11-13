@@ -49,7 +49,47 @@
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Iron Maiden"
-                   :length 223}})
+                   :length 223}
+            #:song{:number 1
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "Invaders"
+                   :length 200}
+            #:song{:number 2
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "Children of the Damned"
+                   :length 274}
+            #:song{:number 3
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "The Prisoner"
+                   :length 334}
+            #:song{:number 4
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "22 Acacia Avenue"
+                   :length 394}
+            #:song{:number 5
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "The Number of the Beast"
+                   :length 265}
+            #:song{:number 6
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "Run to the Hills"
+                   :length 230}
+            #:song{:number 7
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "Gangland"
+                   :length 226}
+            #:song{:number 8
+                   :band-name "Iron Maiden"
+                   :album-name "The Number of the Beast"
+                   :name "Hallowed Be Thy Name"
+                   :length 428}})
 
 (deftest relation-test
   (testing "Set->relation->set"
@@ -59,7 +99,8 @@
   (testing "It aggregates into a relation"
     (is (= #{{:album/length 2259}}
            (|> (r/relation song)
-               (r/aggregate {:album/length [+ :song/length]}))))))
+               (r/aggregate {:album/length [+ :song/length]
+                             :album/max-song-length [max :song/length]}))))))
 
 (deftest project-test
   (testing "It projects keys"
@@ -109,8 +150,9 @@
 
 (deftest left-join-test
   (testing "It joins rows"
-    (is (= #{#:artist{:band-name "The White Stripes"}         
-            {:artist/band-name "Iron Maiden", :song/album-name "Iron Maiden"}}
+    (is (= #{{:artist/band-name "Iron Maiden", :song/album-name "The Number of the Beast"}
+             #:artist{:band-name "The White Stripes"}
+             {:artist/band-name "Iron Maiden", :song/album-name "Iron Maiden"}}
            (|> (r/relation artist)
                (r/left-join (r/relation song) {:artist/band-name :song/band-name})
                (r/project [:artist/band-name :song/album-name])))))
@@ -141,9 +183,39 @@
 
 (deftest aggregate-by-test
   (testing "It aggregates"
-    (is (= #{#:song{:album-name "Iron Maiden", :avg-length 2259/8}}
+    (is (= #{#:song{:album-name "Iron Maiden",
+                    :avg-length 2259/8,
+                    :max-length 422}
+             #:song{:album-name "The Number of the Beast",
+                    :avg-length 2351/8,
+                    :max-length 428}}
            (|> (r/relation song)
-               (r/aggregate-by :song/album-name {:song/avg-length [r/avg-agg :song/length]}))))))
+               (r/aggregate-by :song/album-name {:song/avg-length [r/avg-agg :song/length]
+                                                 :song/max-length [max :song/length]}))))))
+
+(deftest aggregate-over-test
+  (testing "It joins aggregates"
+    (is (= #{#:song{:album-name "Iron Maiden", :avg-length 2259/8}
+             #:song{:album-name "The Number of the Beast", :avg-length 2351/8}}
+           (|> (r/relation song)
+               (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
+               (r/project [:song/album-name :song/avg-length]))))))
+
+(deftest usecase-test
+  (testing "Find the songs on each album longer than the average for that album"
+    (is (= #{#:song{:name "22 Acacia Avenue"}
+             #:song{:name "Strange World"}
+             #:song{:name "Remember Tomorrow"}
+             #:song{:name "The Prisoner"}
+             #:song{:name "Hallowed Be Thy Name"}
+             #:song{:name "Phantom Of the Opera"}}
+           (|> (r/relation song)
+               (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
+               (r/extend :song/longer-than-avg?
+                 (fn [{:song/keys [length avg-length]}]
+                   (< avg-length length)))
+               (r/select :song/longer-than-avg?)
+               (r/project [:song/name]))))))
 
 (deftest normalize
   (testing "It normalizes"
