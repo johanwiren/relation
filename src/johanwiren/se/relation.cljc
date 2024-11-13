@@ -11,7 +11,7 @@
       :cljs [cljs.core :as core])
    [clojure.set :as set]
    [johanwiren.se.relation.impl :as impl])
-  (:refer-clojure :exclude [assoc dissoc set seq update extend update sort-by]))
+  (:refer-clojure :exclude [assoc dissoc set seq update extend update sort-by vec]))
 
 (defmacro |>
   "Convenience threading macro similar to -> that realises into a set."
@@ -45,6 +45,11 @@
     :else
     (throw (#?(:clj IllegalArgumentException. :cljs js/Error.)
             "Relations must be a set/seq of maps"))))
+
+(defn vec
+  "Realises into a (distinct) vector"
+  [rel]
+  (impl/vec rel))
 
 (defn seq
   "Realises into a (distinct) sequence."

@@ -92,9 +92,13 @@
                    :name "Hallowed Be Thy Name"
                    :length 428}})
 
-(deftest relation-test
+(deftest relation-realisation-test
   (testing "Set->relation->set"
-    (is (= artist (-> artist r/relation r/set)))))
+    (is (= artist (-> artist r/relation r/set))))
+  (testing "Set->relation->seq"
+    (is (= (seq artist) (-> artist r/relation r/seq))))
+  (testing "Set->relation->vec"
+    (is (= (vec artist) (-> artist r/relation r/vec)))))
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"
