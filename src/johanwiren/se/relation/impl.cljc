@@ -3,7 +3,6 @@
 
 (defprotocol RelationP
   (set [rel])
-  (seq [rel])
   (compose [rel xform])
   (entries [rel]))
 

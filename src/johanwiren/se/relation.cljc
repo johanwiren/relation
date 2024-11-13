@@ -48,7 +48,7 @@
 (defn seq
   "Realises into a (distinct) sequence."
   [rel]
-  (impl/seq rel))
+  (core/seq rel))
 
 (defn set
   "Realises into a set."
