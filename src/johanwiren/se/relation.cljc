@@ -181,12 +181,14 @@
                         new (if cur
                               (agg-fn cur (key-fn row))
                               (agg-fn (key-fn row)))]
-                    (assoc-in aggs [by k] new)))
+                    (assoc! aggs by (assoc! (get aggs by (transient {})) k new))))
                 aggs
                 aggs-map))))
-       {}
+       (transient {})
        (seq rel))
-      (map (fn [[by rel]] (merge rel by)))
+      (persistent!)
+      (map (fn [[by rel]]
+             (merge (persistent! rel) by)))
       relation)))
   ([rel ks key agg & more]
    (aggregate-by rel ks (apply hash-map key agg more))))
