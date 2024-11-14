@@ -203,17 +203,16 @@
              (r/seq rel))))))
 
 (deftest aggregate-by-test
-  #?(:clj
-     (testing "It aggregates"
-       (is (= #{#:song{:album-name "Iron Maiden",
-                       :avg-length 2259/8,
-                       :max-length 422}
-                #:song{:album-name "The Number of the Beast",
-                       :avg-length 2351/8,
-                       :max-length 428}}
-              (|> (r/relation song)
-                  (r/aggregate-by :song/album-name {:song/avg-length [r/avg-agg :song/length]
-                                                    :song/max-length [max :song/length]})))))))
+  (testing "It aggregates"
+    (is (= #{{:album/length 2351,
+              :song/max-length 428,
+              :song/album-name "The Number of the Beast"}
+             {:album/length 2259,
+              :song/max-length 422,
+              :song/album-name "Iron Maiden"}}
+           (|> (r/relation song)
+               (r/aggregate-by :song/album-name {:album/length [+ :song/length]
+                                                 :song/max-length [max :song/length]}))))))
 
 (deftest aggregate-over-test
   #?(:clj
@@ -257,6 +256,8 @@
 
 
 (comment
+  (|> (r/relation [{:a/k 1} {:a/k 1}])
+      (r/aggregate :b [+ :a/k]))
 
   (let [n 10000]
     (print "relation")
@@ -279,8 +280,11 @@
 
   (|> (r/relation song)
       (r/join (r/relation artist) {:song/band-name :artist/band-name})
-      (r/aggregate-over :song/album-name {:album/length [+ :song/length]
-                                          :album/artists [r/set-agg :artist/name]}))
+      (r/aggregate-by :song/album-name {:album/length [+ :song/length]
+                                        :album/artists [r/set-agg :artist/name]}))
 
+  (|> (r/relation #{{:a 1} {:a 2}})
+      (r/assoc :a 2)
+      (r/aggregate {:a/sum [+ :a]}))
 
   nil)
