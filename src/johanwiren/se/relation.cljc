@@ -170,24 +170,24 @@
 
   Example: (aggregate-by rel [:album/name] {:album/length [+ :song/length]})"
   ([rel ks aggs-map]
-   (->>
-    (index rel (if (keyword? ks) [ks] ks))
-    (map (fn [[idx-key rel]]
-           (->>
-            aggs-map
-            (reduce-kv
-             (fn [aggs agg-k [f k]]
-               (reduce (fn [aggs t]
-                         (let [cur (get aggs agg-k)
-                               new (if cur
-                                     (f cur (k t))
-                                     (f (k t)))]
-                           (core/assoc aggs agg-k new)))
-                       aggs
-                       rel))
-             {})
-            (into idx-key))))
-    relation))
+   (let [ks (if (keyword ks) [ks] ks)]
+     (->>
+      (reduce
+       (fn [aggs row]
+         (let [by (select-keys row ks)]
+           (-> (reduce-kv
+                (fn [aggs k [agg-fn key-fn]]
+                  (let [cur (get-in aggs [by k])
+                        new (if cur
+                              (agg-fn cur (key-fn row))
+                              (agg-fn (key-fn row)))]
+                    (assoc-in aggs [by k] new)))
+                aggs
+                aggs-map))))
+       {}
+       (seq rel))
+      (map (fn [[by rel]] (merge rel by)))
+      relation)))
   ([rel ks key agg & more]
    (aggregate-by rel ks (apply hash-map key agg more))))
 
