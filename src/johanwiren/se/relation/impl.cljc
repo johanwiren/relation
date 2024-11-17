@@ -27,9 +27,6 @@
 (defn entries [rel]
   (sequence (.-xform rel) (.-rel rel)))
 
-(defn count [rel]
-  (core/count (.-rel rel)))
-
 (defn keys [rel]
   (core/keys (first (.-rel rel))))
 
