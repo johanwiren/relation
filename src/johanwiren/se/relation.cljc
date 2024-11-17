@@ -177,18 +177,18 @@
          (let [by (select-keys row ks)]
            (-> (reduce-kv
                 (fn [aggs k [agg-fn key-fn]]
-                  (let [cur (get-in aggs [by k])
-                        new (if cur
-                              (agg-fn cur (key-fn row))
-                              (agg-fn (key-fn row)))]
+                  (let [new (agg-fn (get-in aggs [by k] (agg-fn)) (key-fn row))]
                     (assoc! aggs by (assoc! (get aggs by (transient {})) k new))))
                 aggs
                 aggs-map))))
        (transient {})
        (seq rel))
       (persistent!)
-      (map (fn [[by rel]]
-             (merge (persistent! rel) by)))
+      (map (fn [[by row]]
+             (merge-with (fn [[agg-fn _] res]
+                            (agg-fn res))
+                         aggs-map
+                         (merge (persistent! row) by))))
       relation)))
   ([rel ks key agg & more]
    (aggregate-by rel ks (apply hash-map key agg more))))
@@ -206,7 +206,8 @@
 (defn aggregate
   "Returns an aggregated relation.
   aggs-map should be a map from key to a vector of agg-fn, key-fn.
-  agg-fn must be a reducing function.
+  agg-fn must be a reducing function with an additional zero arity function
+  that produces an initial value.
 
   Example: (aggregate-by rel {:album/length [+ :song/length]})"
   ([rel aggs-map]
@@ -266,33 +267,55 @@
   [xrel yrel]
   (compose xrel (filter (impl/set yrel))))
 
-#?(:clj
-   (defn avg-agg
-     "Average aggregation function.
+(defn stats-agg
+  ([] {:max #?(:clj Double/NEGATIVE_INFINITY
+               :cljs js/Number.MIN_VALUE)
+       :min #?(:clj Double/POSITIVE_INFINITY
+               :cljs js/Number.MAX_VALUE)
+       :avg 0
+       :count 0
+       :sum 0})
+  ([x] x)
+  ([{mn :min mx :max sum :sum cnt :count} y]
+   (hash-map :max (max mx y)
+             :min (min mn y)
+             :sum (+ sum y)
+             :count (inc cnt)
+             :avg (/ (+ sum y) (inc cnt)))))
 
-  Returns the average as a ratio"
-     ([x]
-      (clojure.lang.Ratio. (biginteger x) (biginteger 1)))
-     ([x y]
-      (clojure.lang.Ratio. (biginteger (+ (numerator x) y))
-                           (biginteger (inc (denominator x)))))))
+(defn extend-stats [rel k]
+  (let [ns (namespace k)]
+    (compose
+     rel
+     (map #(merge
+            (core/dissoc % k)
+            (update-keys
+             (k %)
+             (fn [stat-k]
+               (keyword ns
+                        (if (= :count stat-k)
+                          (name stat-k)
+                          (str (name stat-k) "-" (name k)))))))))))
+(defn conj-agg [ctor]
+  (fn
+    ([] (ctor))
+    ([x] x)
+    ([x y] (conj x y))))
 
-(defn vec-agg
+(def vec-agg
   "Vector aggregation function.
 
   Collects all values into a vector."
-  ([x] (vector x))
-  ([x y] (conj x y)))
+  (conj-agg vector))
 
-(defn set-agg
+(def set-agg
   "Set aggregation function.
 
   Collects all values into a set."
-  ([x] (hash-set x))
-  ([x y] (conj x y)))
+  (conj-agg hash-set))
 
 (def count-agg
   "Count aggregation function
 
   Returns the rowcount."
-  [+ (constantly 1)])
+  [+ (completing (constantly 1))])

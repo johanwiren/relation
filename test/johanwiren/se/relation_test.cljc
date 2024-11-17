@@ -102,10 +102,13 @@
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"
-    (is (= #{#:album{:length 4610, :max-song-length 428}}
+    (is (= #{#:album{:length 4610}}
            (|> (r/relation song)
-               (r/aggregate {:album/length [+ :song/length]
-                             :album/max-song-length [max :song/length]}))))))
+               (r/aggregate {:album/length [+ :song/length]})))))
+  (testing "It completes after aggregating"
+    (is (= #{#:album{:length -4610}}
+           (|> (r/relation song)
+               (r/aggregate {:album/length [(completing + -) :song/length]}))))))
 
 (deftest project-test
   (testing "It projects keys"
@@ -205,40 +208,64 @@
 (deftest aggregate-by-test
   (testing "It aggregates"
     (is (= #{{:album/length 2351,
-              :song/max-length 428,
               :song/album-name "The Number of the Beast"}
              {:album/length 2259,
-              :song/max-length 422,
               :song/album-name "Iron Maiden"}}
            (|> (r/relation song)
-               (r/aggregate-by :song/album-name {:album/length [+ :song/length]
-                                                 :song/max-length [max :song/length]}))))))
+               (r/aggregate-by :song/album-name {:album/length [+ :song/length]}))))))
+
+(deftest stats-test
+  (testing "It builds stats"
+    (is (= #{#:song{:length-stats
+                   {:min 200, :max 428, :count 8, :avg #?(:clj 2351/8 :cljs 293.875), :sum 2351},
+                   :album-name "The Number of the Beast"}
+            #:song{:length-stats
+                   {:min 202, :max 422, :count 8, :avg #?(:clj 2259/8 :cljs 282.375) :sum 2259},
+                   :album-name "Iron Maiden"}}
+           (|> (r/relation song)
+               (r/aggregate-by :song/album-name {:song/length-stats [r/stats-agg :song/length]})))))
+  (testing "It extends stats"
+    (is (= #{#:song{:album-name "Iron Maiden",
+                    :min-length 202,
+                    :max-length 422,
+                    :count 8,
+                    :avg-length #?(:clj 2259/8 :cljs 282.375),
+                    :sum-length 2259}
+             #:song{:album-name "The Number of the Beast",
+                    :min-length 200,
+                    :max-length 428,
+                    :count 8,
+                    :avg-length #?(:clj 2351/8 :cljs 293.875),
+                    :sum-length 2351}}
+           (|> (r/relation song)
+               (r/aggregate-by :song/album-name {:song/length [r/stats-agg :song/length]})
+               (r/extend-stats :song/length))))))
 
 (deftest aggregate-over-test
-  #?(:clj
-     (testing "It joins aggregates"
-       (is (= #{#:song{:album-name "Iron Maiden", :avg-length 2259/8}
-                #:song{:album-name "The Number of the Beast", :avg-length 2351/8}}
-              (|> (r/relation song)
-                  (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
-                  (r/project [:song/album-name :song/avg-length])))))))
+  (testing "It joins aggregates"
+    (is (= #{{:song/album-name "Iron Maiden", :album/length 2259}
+             {:song/album-name "The Number of the Beast", :album/length 2351}}
+           (|> (r/relation song)
+               (r/aggregate-over :song/album-name {:album/length [+ :song/length]})
+               (r/project [:song/album-name :album/length]))))))
 
 (deftest usecase-test
-  #?(:clj
-     (testing "Find the songs on each album longer than the average for that album"
-       (is (= #{#:song{:name "22 Acacia Avenue"}
-                #:song{:name "Strange World"}
-                #:song{:name "Remember Tomorrow"}
-                #:song{:name "The Prisoner"}
-                #:song{:name "Hallowed Be Thy Name"}
-                #:song{:name "Phantom Of the Opera"}}
-              (|> (r/relation song)
-                  (r/aggregate-over :song/album-name {:song/avg-length [r/avg-agg :song/length]})
-                  (r/extend :song/longer-than-avg?
-                    (fn [{:song/keys [length avg-length]}]
-                      (< avg-length length)))
-                  (r/select :song/longer-than-avg?)
-                  (r/project [:song/name])))))))
+  (testing "Find the songs on each album longer than the average for that album"
+    (is (= #{#:song{:name "22 Acacia Avenue"}
+             #:song{:name "Strange World"}
+             #:song{:name "Remember Tomorrow"}
+             #:song{:name "The Prisoner"}
+             #:song{:name "Hallowed Be Thy Name"}
+             #:song{:name "Phantom Of the Opera"}}
+           (|> (r/relation song)
+               (r/aggregate-over :song/album-name {:album/song-length [r/stats-agg :song/length]})
+               (r/extend-stats :album/song-length)
+               (r/extend :song/longer-than-avg?
+                 (fn [{:song/keys [length]
+                       :album/keys [avg-song-length]}]
+                   (< avg-song-length length)))
+               (r/select :song/longer-than-avg?)
+               (r/project [:song/name]))))))
 
 (deftest normalize
   (testing "It normalizes"
