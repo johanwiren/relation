@@ -118,6 +118,15 @@ comes with a few build in aggregation functions:
 All aggregations are transducing functions which means that we can easily
 use any of the statistics from [MastodonC/kixi.stats](https://github.com/MastodonC/kixi.stats)
 
+``` clojure
+(require '[kixi.stats.core :as stats])
+
+(|> (r/relation employee)
+    (r/aggregate {:emp-id-stddev [stats/standard-deviation :emp-id]}))
+=>
+#{{:emp-id-stddev 915.1378038306581}}
+```
+
 ### Extending
 
 Since everything is built on tranducers you can easily add your own steps.
