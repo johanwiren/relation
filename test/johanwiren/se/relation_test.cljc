@@ -243,11 +243,25 @@
 
 (deftest aggregate-over-test
   (testing "It joins aggregates"
-    (is (= #{{:song/album-name "Iron Maiden", :album/length 2259}
-             {:song/album-name "The Number of the Beast", :album/length 2351}}
+    (is (= #{{:song/name "Children of the Damned", :album/length 2351}
+             {:song/name "Transylvania", :album/length 2259}
+             {:song/name "Charlotte the Harlot", :album/length 2259}
+             {:song/name "Prowler", :album/length 2259}
+             {:song/name "Iron Maiden", :album/length 2259}
+             {:song/name "Run to the Hills", :album/length 2351}
+             {:song/name "The Prisoner", :album/length 2351}
+             {:song/name "22 Acacia Avenue", :album/length 2351}
+             {:song/name "Phantom Of the Opera", :album/length 2259}
+             {:song/name "Invaders", :album/length 2351}
+             {:song/name "Remember Tomorrow", :album/length 2259}
+             {:song/name "Running Free", :album/length 2259}
+             {:song/name "Hallowed Be Thy Name", :album/length 2351}
+             {:song/name "Gangland", :album/length 2351}
+             {:song/name "Strange World", :album/length 2259}
+             {:song/name "The Number of the Beast", :album/length 2351}}
            (|> (r/relation song)
                (r/aggregate-over :song/album-name {:album/length [+ :song/length]})
-               (r/project [:song/album-name :album/length]))))))
+               (r/project [:song/name :album/length]))))))
 
 (deftest usecase-test
   (testing "Find the songs on each album longer than the average for that album"
