@@ -263,6 +263,43 @@
                (r/aggregate-over :song/album-name {:album/length [+ :song/length]})
                (r/project [:song/name :album/length]))))))
 
+(deftest expand-kv-test
+  (testing "It expands maps"
+    (is (= #{#:song{:key :max, :val 428}
+             #:song{:key :sum, :val 4610}
+             #:song{:key :avg, :val #?(:clj 2305/8 :cljs 288.125)}
+             #:song{:key :min, :val 200}
+             #:song{:key :count, :val 16}}
+           (|> (r/relation song)
+               (r/aggregate {:song/length [r/stats-agg :song/length]})
+               (r/expand-kv :song/length))))))
+
+(deftest extend-kv-test
+  (testing "It extends maps"
+    (is (= #{#:song{:album-name "Iron Maiden",
+                    :min 202,
+                    :max 422,
+                    :count 8,
+                    :avg #?(:clj 2259/8 :cljs 282.375),
+                    :sum 2259}
+             #:song{:album-name "The Number of the Beast",
+                    :min 200,
+                    :max 428,
+                    :count 8,
+                    :avg #?(:clj 2351/8 :cljs 293.875),
+                    :sum 2351}}
+           (|> (r/relation song)
+               (r/aggregate-by :song/album-name {:song/length [r/stats-agg :song/length]})
+               (r/extend-kv :song/length))))))
+
+(deftest expand-seq
+  (testing "It expands seqs"
+    (is (= #{#:album{:names "Iron Maiden"}
+             #:album{:names "The Number of the Beast"}}
+           (|> (r/relation song)
+               (r/aggregate {:album/names [r/set-agg :song/album-name]})
+               (r/expand-seq :album/names))))))
+
 (deftest usecase-test
   (testing "Find the songs on each album longer than the average for that album"
     (is (= #{#:song{:name "22 Acacia Avenue"}

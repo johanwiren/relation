@@ -299,6 +299,37 @@
                         (if (= :count stat-k)
                           (name stat-k)
                           (str (name stat-k) "-" (name k)))))))))))
+
+(defn extend-kv [rel k]
+  (let [ns (namespace k)]
+    (comp
+     rel
+     (map #(merge
+            (core/dissoc % k)
+            (update-keys
+             (k %)
+             (fn [k']
+               (keyword ns (name k')))))))))
+
+(defn expand-kv [rel k]
+  (let [ns (namespace k)]
+    (comp
+     rel
+     (mapcat (fn [row]
+               (map (fn [[key val]]
+                      (core/assoc (core/dissoc row k)
+                                  (keyword ns "key") key
+                                  (keyword ns "val") val))
+                    (k row)))))))
+
+(defn expand-seq [rel k]
+  (comp
+   rel
+   (mapcat (fn [row]
+             (map (fn [val]
+                    (core/assoc row k val))
+                  (k row))))))
+
 (defn conj-agg [ctor]
   (fn
     ([] (ctor))
