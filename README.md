@@ -128,18 +128,15 @@ Since everything is built on tranducers you can easily add your own steps.
   (map (fn [row] (update row :emp-id #(str "subsidiary-" %)))))
 
 (|> (r/relation employee)
-    (r/join (r/relation dept) {:dept-name :dept-name})
-    (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
-    (r/update :dept-colleagues count)
-    (r/sort-by :emp-id)
     (r/comp xform)
     (r/project [:emp-id]))
     
 =>
-#{{:emp-id "subsidiary-2202"}
-  {:emp-id "subsidiary-2241"}
-  {:emp-id "subsidiary-3401"}
-  {:emp-id "subsidiary-3415"}}
+#{{:emp-id "subsidiary-2241"}
+  {:emp-id "subsidiary-3415"}
+  {:emp-id "subsidiary-2202"}
+  {:emp-id "subsidiary-1257"}
+  {:emp-id "subsidiary-3401"}}
 ```
 
 Or use `r/comp` which most of relation's operations are built upon to make your own
@@ -150,14 +147,12 @@ named operation.
   (r/comp rel (map (fn [row] (update row :emp-id #(str "subsidiary-" %))))))
 
 (|> (r/relation employee)
-    (r/join (r/relation dept) {:dept-name :dept-name})
-    (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
-    (r/update :dept-colleagues count)
     (r/sort-by :emp-id)
     make-subsidiary
     (r/project [:emp-id]))
 
-#{{:emp-id "subsidiary-2202"}
+#{{:emp-id "subsidiary-1257"}
+  {:emp-id "subsidiary-2202"}
   {:emp-id "subsidiary-2241"}
   {:emp-id "subsidiary-3401"}
   {:emp-id "subsidiary-3415"}}
