@@ -203,6 +203,19 @@
               #:artist{:name "Meg White"}
               #:artist{:name "Nicko McBrain"}
               #:artist{:name "Steve Harris"}]
+             (r/seq rel)))))
+  (testing "It uses keeps all entries"
+    (let [rel (-> (r/relation artist)
+                  (r/sort-by :artist/band-name)
+                  (r/project [:artist/name :artist/band-name]))]
+      (is (sorted? (r/set rel)))
+      (is (= [#:artist{:name "Bruce Dickinson", :band-name "Iron Maiden"}
+              #:artist{:name "Adrian Smith", :band-name "Iron Maiden"}
+              #:artist{:name "Nicko McBrain", :band-name "Iron Maiden"}
+              #:artist{:name "Dave Murray", :band-name "Iron Maiden"}
+              #:artist{:name "Steve Harris", :band-name "Iron Maiden"}
+              #:artist{:name "Jack White", :band-name "The White Stripes"}
+              #:artist{:name "Meg White", :band-name "The White Stripes"}]
              (r/seq rel))))))
 
 (deftest aggregate-by-test

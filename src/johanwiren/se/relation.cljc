@@ -219,7 +219,8 @@
    (aggregate-by rel [] (apply hash-map key agg more))))
 
 (defn sort-by [rel keyfn]
-  (relation (into (sorted-set-by #(compare (keyfn %1) (keyfn %2))) (impl/entries rel))))
+  (let [by (juxt keyfn hash)]
+    (relation (into (sorted-set-by #(compare (by %1) (by %2))) (impl/entries rel)))))
 
 (defn normalize
   "Normalizes a relation.
