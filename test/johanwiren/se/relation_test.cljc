@@ -276,6 +276,20 @@
                (r/aggregate-over :song/album-name {:album/length [+ :song/length]})
                (r/project [:song/name :album/length]))))))
 
+(deftest aggs-test
+  (testing "count-agg"
+    (is (= #{{:song/count 16}}
+           (|> (r/relation song)
+               (r/aggregate {:song/count r/count-agg})))))
+  (testing "set-agg"
+    (is (= #{#:album{:names #{"The Number of the Beast" "Iron Maiden"}}}
+           (|> (r/relation song)
+               (r/aggregate {:album/names [r/set-agg :song/album-name]})))))
+  (testing "vec-agg"
+    (is (= #{#:song{:lengths [422 330 343 265 428 226 274 334 254 202 200 230 249 223 236 394]}}
+           (|> (r/relation song)
+               (r/aggregate {:song/lengths [r/vec-agg :song/length]}))))))
+
 (deftest expand-kv-test
   (testing "It expands maps"
     (is (= #{#:song{:key :max, :val 428}

@@ -353,4 +353,4 @@
   "Count aggregation function
 
   Returns the rowcount."
-  [+ (completing (constantly 1))])
+  [+ (constantly 1)])
