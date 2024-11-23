@@ -239,33 +239,34 @@
 
   Realises rel."
   [rel]
-  (->> rel
-       impl/entries
-       (reduce (fn [{:keys [relmap ks kmap]} row]
-                 (let [rel-keys (keys row)
-                       update-ks? (not-every? ks rel-keys)
-                       ks (if update-ks? (into ks (keys row)) ks)
-                       kmap (if update-ks?
-                              (core/group-by (core/comp keyword namespace) ks)
-                              kmap)]
-                   {:kmap kmap
-                    :ks ks
-                    :relmap
-                    (reduce-kv (fn [relmap relvar ks]
-                                 (let [selected (select-keys row ks)]
-                                   (if (core/seq selected)
-                                     (core/assoc! relmap
-                                                  relvar
-                                                  (conj (get relmap relvar #{})
-                                                        selected))
-                                     relmap)))
-                               relmap
-                               kmap)}))
-               {:kmap {}
-                :ks #{}
-                :relmap (transient {})})
-       :relmap
-       (persistent!)))
+  (->
+   (reduce (fn [{:keys [relmap ks kmap]} row]
+             (let [rel-keys (keys row)
+                   update-ks? (not-every? ks rel-keys)
+                   ks (if update-ks? (into ks (keys row)) ks)
+                   kmap (if update-ks?
+                          (core/group-by (core/comp keyword namespace) ks)
+                          kmap)]
+               {:kmap kmap
+                :ks ks
+                :relmap
+                (reduce-kv (fn [relmap relvar ks]
+                             (let [selected (select-keys row ks)]
+                               (if (core/seq selected)
+                                 (core/assoc! relmap
+                                              relvar
+                                              (conj! (get relmap relvar (transient #{}))
+                                                     selected))
+                                 relmap)))
+                           relmap
+                           kmap)}))
+           {:kmap {}
+            :ks #{}
+            :relmap (transient {})}
+           (impl/entries rel))
+   :relmap
+   (persistent!)
+   (update-vals persistent!)))
 
 (defn union
   "Returns a relation that is the union of xrel and yrel."
