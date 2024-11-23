@@ -94,11 +94,27 @@
 
 (deftest relation-realisation-test
   (testing "Set->relation->set"
-    (is (= artist (-> artist r/relation r/set))))
+    (let [res (-> artist r/relation r/set)]
+      (is (identical? artist res) "No transformation passes through untouched")
+      (is (set? res))
+      (is (= artist res)))
+    (let [res (-> artist r/relation (r/update :artist/name identity) r/set)]
+      (is (set? res))
+      (is (= artist res))))
   (testing "Set->relation->seq"
-    (is (= (seq artist) (-> artist r/relation r/seq))))
+    (let [res (-> artist r/relation r/seq)]
+      (is (seq? res))
+      (is (= (seq artist) res)))
+    (let [res (-> artist r/relation (r/update :artist/name identity) r/seq)]
+      (is (seq? res))
+      (is (= (seq artist) res))))
   (testing "Set->relation->vec"
-    (is (= (vec artist) (-> artist r/relation r/vec)))))
+    (let [res (-> artist r/relation r/vec)]
+      (is (vector? res))
+      (is (= (vec artist) res)))
+    (let [res (-> artist r/relation (r/update :artist/name identity) r/vec)]
+      (is (vector? res))
+      (is (= (vec artist) res)))))
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"
