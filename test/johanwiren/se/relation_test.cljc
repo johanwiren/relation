@@ -302,8 +302,9 @@
            (|> (r/relation song)
                (r/aggregate {:album/names [r/set-agg :song/album-name]})))))
   (testing "vec-agg"
-    (is (= #{#:song{:lengths [422 330 343 265 428 226 274 334 254 202 200 230 249 223 236 394]}}
+    (is (= #{#:song{:lengths [200 202 223 226 230 236 249 254 265 274 330 334 343 394 422 428]}}
            (|> (r/relation song)
+               (r/sort-by :song/length)
                (r/aggregate {:song/lengths [r/vec-agg :song/length]}))))))
 
 (deftest expand-kv-test
