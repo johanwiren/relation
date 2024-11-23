@@ -151,6 +151,11 @@
                (r/join (r/relation artist) {})
                r/set
                count))))
+  (testing "Yrel precedence when merging keys"
+    (is (= #{{:b/k 1, :common 2, :a/k 1}}
+           (|> (r/relation #{{:a/k 1 :common 1}})
+               (r/join (r/relation #{{:b/k 1 :common 2}})
+                       {:a/k :b/k})))))
   (testing "It joins rows"
     (is (= #{#:artist{:name "Steve Harris"}
              #:artist{:name "Bruce Dickinson"}

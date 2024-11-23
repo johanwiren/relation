@@ -123,7 +123,7 @@
    persistent!
    (update-vals persistent!)))
 
-(defn- join* [yrel kmap]
+(defn- join* [yrel kmap merge-fn keep-not-found?]
   (fn [rf]
     (let [idx (index yrel (vals kmap))]
       (fn
@@ -132,39 +132,42 @@
         ([res item]
          (let [found (get idx (set/rename-keys (select-keys item (keys kmap)) kmap))]
            (if found
-             (reduce rf res (map #(merge item %) found))
-             res)))))))
+             (reduce rf res (map #(merge-with merge-fn item %) found))
+             (if keep-not-found?
+               (rf res item)
+               item))))))))
+
+(defn- left-precedence [a _] a)
+(defn- right-precedence [_ b] b)
+
+(defn- flip? [xrel yrel]
+  (if (and
+       (impl/counted? xrel)
+       (impl/counted? yrel))
+    (<= (impl/count xrel) (impl/count yrel))
+    (<= (count (impl/keys xrel)) (count (impl/keys yrel)))))
 
 (defn join
-  "Joins relation yrel using the corresponding attributes in kmap. "
+  "Joins relation yrel using the corresponding attributes in kmap.
+
+  Keys in yrel will be merged into xrel with yrel taking precedence."
   [xrel yrel kmap]
   (let [yrel (relation yrel)]
-    (if (<= (count (impl/keys xrel)) (count (impl/keys yrel)))
-      (comp yrel (join* xrel (set/map-invert kmap)))
-      (comp xrel (join* yrel kmap)))))
-
-(defn- left-join* [yrel kmap]
-  (fn [rf]
-    (let [idx (index yrel (vals kmap))]
-      (fn
-        ([] (rf))
-        ([res] (rf res))
-        ([res item]
-         (let [found (get idx (set/rename-keys (select-keys item (keys kmap)) kmap))]
-           (if found
-             (reduce rf res (map #(merge item %) found))
-             (rf res item))))))))
+    (if (flip? xrel yrel)
+      (comp yrel (join* xrel (set/map-invert kmap) left-precedence false))
+      (comp xrel (join* yrel kmap right-precedence false)))))
 
 (defn left-join
   "Same as join but always keeps all rows in xrel"
   [xrel yrel kmap]
-  (comp xrel (left-join* (relation yrel) kmap)))
+  (let [yrel (relation yrel)]
+    (comp xrel (join* yrel kmap right-precedence true))))
 
 (defn right-join
   "Same as join but always keep all rows in yrel"
   [xrel yrel kmap]
   (let [yrel (relation yrel)]
-    (comp yrel (left-join* xrel (set/map-invert kmap)))))
+    (comp yrel (join* xrel (set/map-invert kmap) left-precedence true))))
 
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.

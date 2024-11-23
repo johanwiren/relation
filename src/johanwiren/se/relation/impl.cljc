@@ -1,7 +1,7 @@
 (ns johanwiren.se.relation.impl
   #?(:clj (:require [clojure.core :as core])
      :cljs (:require [cljs.core :as core]))
-  (:refer-clojure :exclude [keys set seq count vec]))
+  (:refer-clojure :exclude [keys set seq count vec counted?]))
 
 (deftype Relation [xform rel])
 
@@ -40,3 +40,10 @@
 
 (defn relation? [x]
   (instance? Relation x))
+
+(defn counted? [rel]
+  (= identity (.-xform rel)))
+
+(defn count [rel]
+  (and (counted? rel)
+       (core/count (.-rel rel))))
