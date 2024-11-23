@@ -275,12 +275,18 @@
 (defn difference
   "Returns a relation that is xrel without the elemens in yrel."
   [xrel yrel]
-  (comp xrel (remove (impl/set yrel))))
+  (let [yset (impl/set yrel)]
+    (if (empty? yset)
+      xrel
+      (comp xrel (remove (impl/set yrel))))))
 
 (defn intersection
   "Returns a relation that is the intersection of xrel and yrel."
   [xrel yrel]
-  (comp xrel (filter (impl/set yrel))))
+  (let [yset (impl/set yrel)]
+    (if (empty? yset)
+      (relation #{})
+      (comp xrel (filter yset)))))
 
 (defn stats-agg
   ([] {:max #?(:clj Double/NEGATIVE_INFINITY
