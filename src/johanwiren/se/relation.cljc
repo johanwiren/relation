@@ -241,10 +241,10 @@
   [rel]
   (->> rel
        impl/entries
-       (reduce (fn [{:keys [relmap ks kmap]} rel]
-                 (let [rel-keys (keys rel)
+       (reduce (fn [{:keys [relmap ks kmap]} row]
+                 (let [rel-keys (keys row)
                        update-ks? (not-every? ks rel-keys)
-                       ks (if update-ks? (into ks (keys rel)) ks)
+                       ks (if update-ks? (into ks (keys row)) ks)
                        kmap (if update-ks?
                               (core/group-by (core/comp keyword namespace) ks)
                               kmap)]
@@ -252,7 +252,7 @@
                     :ks ks
                     :relmap
                     (reduce-kv (fn [relmap relvar ks]
-                                 (let [selected (select-keys rel ks)]
+                                 (let [selected (select-keys row ks)]
                                    (if (core/seq selected)
                                      (core/assoc! relmap
                                                   relvar
