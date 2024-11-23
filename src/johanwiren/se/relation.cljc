@@ -227,12 +227,7 @@
                    yval (keyfn y)
                    by-val (compare xval yval)]
                (if (zero? by-val)
-                 (let [xtype (type x)
-                       ytype (type y)
-                       by-type (compare xtype ytype)]
-                   (if (zero? by-type)
-                     (compare (hash x) (hash y))
-                     by-type))
+                 (compare (hash x) (hash y))
                  by-val)))]
     (relation (into (sorted-set-by by) (impl/entries rel)))))
 
