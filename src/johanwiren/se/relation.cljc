@@ -168,6 +168,30 @@
   (let [yrel (relation yrel)]
     (comp yrel (join* xrel (set/map-invert kmap) left-precedence true))))
 
+(defn- full-join* [yrel kmap]
+  (fn [rf]
+    (let [idx (index yrel (vals kmap))
+          used-idx-keys (volatile! #{})]
+      (fn
+        ([] (rf))
+        ([res]
+         (let [yitems (->> (apply core/dissoc idx @used-idx-keys)
+                           (vals)
+                           (apply concat))]
+           (rf (reduce rf res yitems))))
+        ([res item]
+         (let [idx-key (set/rename-keys (select-keys item (keys kmap)) kmap)
+               found (get idx idx-key)]
+           (if found
+             (do
+               (vswap! used-idx-keys conj idx-key)
+               (reduce rf res (map #(merge item %) found)))
+             (rf res item))))))))
+
+(defn full-join [xrel yrel kmap]
+  (let [yrel (relation yrel)]
+    (comp xrel (full-join* yrel kmap))))
+
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
   aggs-map should be a map from key to a vector of agg-fn, key-fn.

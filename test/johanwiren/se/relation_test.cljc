@@ -208,6 +208,27 @@
                (r/right-join (r/relation artist) {:song/band-name :artist/band-name})
                (r/project [:artist/band-name]))))))
 
+(deftest full-join-test
+  (testing "It keeps rows on the left"
+    (is (= #{#:artist{:band-name "Iron Maiden"}
+             #:artist{:band-name "The White Stripes"}}
+           (|> (r/relation artist)
+               (r/full-join song {:artist/band-name :song/band-name})
+               (r/project [:artist/band-name])))))
+  (testing "It merges matched rows"
+    (is (= #{{:artist/band-name "Iron Maiden", :song/album-name "The Number of the Beast"}
+             {:artist/band-name "Iron Maiden", :song/album-name "Iron Maiden"}
+             #:artist{:band-name "The White Stripes"}}
+           (|> (r/relation artist)
+               (r/full-join song {:artist/band-name :song/band-name})
+               (r/project [:artist/band-name :song/album-name])))))
+  (testing "It keeps rows on the right"
+    (is (= #{#:artist{:band-name "Iron Maiden"}
+             #:artist{:band-name "The White Stripes"}}
+           (|> (r/relation song)
+               (r/full-join artist {:song/band-name :artist/band-name})
+               (r/project [:artist/band-name]))))))
+
 (deftest sort-by-test
   (testing "It sorts"
     (let [rel (-> (r/relation artist)
