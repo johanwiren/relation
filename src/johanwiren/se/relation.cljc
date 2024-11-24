@@ -123,17 +123,28 @@
    persistent!
    (update-vals persistent!)))
 
-(defn- join* [yrel kmap merge-fn keep-not-found?]
+(defn- join* [yrel kmap merge-fn kind]
   (fn [rf]
-    (let [idx (index (relation yrel) (vals kmap))]
+    (let [idx (index (relation yrel) (vals kmap))
+          used-idx-keys (volatile! #{})]
       (fn
         ([] (rf))
-        ([res] (rf res))
+        ([res]
+         (if (= :outer kind)
+           (let [yitems (->> (apply core/dissoc idx @used-idx-keys)
+                             (vals)
+                             (apply concat))]
+             (rf (reduce rf res yitems)))
+           (rf res)))
         ([res item]
-         (let [found (get idx (set/rename-keys (select-keys item (keys kmap)) kmap))]
+         (let [idx-key (set/rename-keys (select-keys item (keys kmap)) kmap)
+               found (get idx idx-key)]
            (if found
-             (reduce rf res (map #(merge-with merge-fn item %) found))
-             (if keep-not-found?
+             (do
+               (when (= :outer kind)
+                 (vswap! used-idx-keys conj idx-key))
+               (reduce rf res (map #(merge-with merge-fn item %) found)))
+             (if (= :outer kind)
                (rf res item)
                item))))))))
 
@@ -154,41 +165,21 @@
   Keys in yrel will be merged into xrel with yrel taking precedence."
   [xrel yrel kmap]
   (if (flip? xrel yrel)
-    (comp yrel (join* xrel (set/map-invert kmap) left-precedence false))
-    (comp xrel (join* yrel kmap right-precedence false))))
+    (comp yrel (join* xrel (set/map-invert kmap) left-precedence :inner))
+    (comp xrel (join* yrel kmap right-precedence :inner))))
 
 (defn left-join
   "Same as join but always keeps all rows in xrel"
   [xrel yrel kmap]
-  (comp xrel (join* yrel kmap right-precedence true)))
+  (comp xrel (join* yrel kmap right-precedence :outer)))
 
 (defn right-join
   "Same as join but always keep all rows in yrel"
   [xrel yrel kmap]
-  (comp yrel (join* xrel (set/map-invert kmap) left-precedence true)))
-
-(defn- full-join* [yrel kmap]
-  (fn [rf]
-    (let [idx (index (relation yrel) (vals kmap))
-          used-idx-keys (volatile! #{})]
-      (fn
-        ([] (rf))
-        ([res]
-         (let [yitems (->> (apply core/dissoc idx @used-idx-keys)
-                           (vals)
-                           (apply concat))]
-           (rf (reduce rf res yitems))))
-        ([res item]
-         (let [idx-key (set/rename-keys (select-keys item (keys kmap)) kmap)
-               found (get idx idx-key)]
-           (if found
-             (do
-               (vswap! used-idx-keys conj idx-key)
-               (reduce rf res (map #(merge item %) found)))
-             (rf res item))))))))
+  (comp yrel (join* xrel (set/map-invert kmap) left-precedence :outer)))
 
 (defn full-join [xrel yrel kmap]
-  (comp xrel (full-join* yrel kmap)))
+  (comp xrel (join* yrel kmap right-precedence :outer)))
 
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
