@@ -119,42 +119,42 @@
 (deftest aggregate-test
   (testing "It aggregates into a relation"
     (is (= #{#:album{:length 4610}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate {:album/length [+ :song/length]})))))
   (testing "It completes after aggregating"
     (is (= #{#:album{:length -4610}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate {:album/length [(completing + -) :song/length]}))))))
 
 (deftest project-test
   (testing "It projects keys"
     (is (= #{#:artist{:band-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
-           (|> (r/relation artist)
+           (|> artist
                (r/project [:artist/band-name]))))))
 
 (deftest select-test
   (testing "It selects rows"
     (is (= #{#:artist{:name "Jack White", :band-name "The White Stripes"}
              #:artist{:name "Meg White", :band-name "The White Stripes"}}
-           (|> (r/relation artist)
+           (|> artist
                (r/select (comp #{"The White Stripes"} :artist/band-name)))))
     (is (= #{#:artist{:band-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
-           (|> (r/relation artist)
+           (|> artist
                (r/project [:artist/band-name]))))))
 
 (deftest join-test
   (testing "Cross join"
     (is (= (* (count artist) (count song))
-           (-> (r/relation song)
-               (r/join (r/relation artist) {})
+           (-> song
+               (r/join artist {})
                r/set
                count))))
   (testing "Yrel precedence when merging keys"
     (is (= #{{:b/k 1, :common 2, :a/k 1}}
-           (|> (r/relation #{{:a/k 1 :common 1}})
-               (r/join (r/relation #{{:b/k 1 :common 2}})
+           (|> #{{:a/k 1 :common 1}}
+               (r/join #{{:b/k 1 :common 2}}
                        {:a/k :b/k})))))
   (testing "It joins rows"
     (is (= #{#:artist{:name "Steve Harris"}
@@ -162,19 +162,19 @@
              #:artist{:name "Dave Murray"}
              #:artist{:name "Adrian Smith"}
              #:artist{:name "Nicko McBrain"}}
-           (|> (r/relation song)
+           (|> song
                (r/select (comp #(< 400 %) :song/length))
-               (r/join (r/relation artist) {:song/band-name :artist/band-name})
+               (r/join artist {:song/band-name :artist/band-name})
                (r/project [:artist/name])))))
   (testing "It omits unmatched right rows"
     (is (= #{#:artist{:band-name "Iron Maiden"}}
-           (|> (r/relation song)
-               (r/join (r/relation artist) {:song/band-name :artist/band-name})
+           (|> song
+               (r/join artist {:song/band-name :artist/band-name})
                (r/project [:artist/band-name])))))
   (testing "It omits unmatched left rows"
     (is (= #{#:artist{:band-name "Iron Maiden"}}
-           (|> (r/relation artist)
-               (r/join (r/relation song) {:artist/band-name :song/band-name})
+           (|> artist
+               (r/join song {:artist/band-name :song/band-name})
                (r/project [:artist/band-name]))))))
 
 (deftest left-join-test
@@ -182,14 +182,14 @@
     (is (= #{{:artist/band-name "Iron Maiden", :song/album-name "The Number of the Beast"}
              #:artist{:band-name "The White Stripes"}
              {:artist/band-name "Iron Maiden", :song/album-name "Iron Maiden"}}
-           (|> (r/relation artist)
-               (r/left-join (r/relation song) {:artist/band-name :song/band-name})
+           (|> artist
+               (r/left-join song {:artist/band-name :song/band-name})
                (r/project [:artist/band-name :song/album-name])))))
   (testing "It keeps unmatched left rows"
     (is (= #{#:artist{:band-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
-           (|> (r/relation artist)
-               (r/left-join (r/relation song) {:artist/band-name :song/band-name})
+           (|> artist
+               (r/left-join song {:artist/band-name :song/band-name})
                (r/project [:artist/band-name]))))))
 
 (deftest right-join-test
@@ -198,40 +198,40 @@
               :song/album-name "The Number of the Beast"}
              #:artist{:band-name "The White Stripes"}
              {:artist/band-name "Iron Maiden", :song/album-name "Iron Maiden"}}
-           (|> (r/relation song)
-               (r/right-join (r/relation artist) {:song/band-name :artist/band-name})
+           (|> song
+               (r/right-join artist {:song/band-name :artist/band-name})
                (r/project [:artist/band-name :song/album-name])))))
   (testing "It keeps unmatched right rows"
     (is (= #{#:artist{:band-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
-           (|> (r/relation song)
-               (r/right-join (r/relation artist) {:song/band-name :artist/band-name})
+           (|> song
+               (r/right-join artist {:song/band-name :artist/band-name})
                (r/project [:artist/band-name]))))))
 
 (deftest full-join-test
   (testing "It keeps rows on the left"
     (is (= #{#:artist{:band-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
-           (|> (r/relation artist)
+           (|> artist
                (r/full-join song {:artist/band-name :song/band-name})
                (r/project [:artist/band-name])))))
   (testing "It merges matched rows"
     (is (= #{{:artist/band-name "Iron Maiden", :song/album-name "The Number of the Beast"}
              {:artist/band-name "Iron Maiden", :song/album-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
-           (|> (r/relation artist)
+           (|> artist
                (r/full-join song {:artist/band-name :song/band-name})
                (r/project [:artist/band-name :song/album-name])))))
   (testing "It keeps rows on the right"
     (is (= #{#:artist{:band-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
-           (|> (r/relation song)
+           (|> song
                (r/full-join artist {:song/band-name :artist/band-name})
                (r/project [:artist/band-name]))))))
 
 (deftest sort-by-test
   (testing "It sorts"
-    (let [rel (-> (r/relation artist)
+    (let [rel (-> artist
                   (r/sort-by :artist/name)
                   (r/project [:artist/name]))]
       (is (sorted? (r/set rel)))
@@ -247,7 +247,7 @@
               #:artist{:name "Steve Harris"}]
              (r/seq rel)))))
   (testing "It uses keeps all entries"
-    (let [rel (-> (r/relation artist)
+    (let [rel (-> artist
                   (r/sort-by :artist/band-name)
                   (r/project [:artist/name :artist/band-name]))]
       (is (sorted? (r/set rel)))
@@ -266,7 +266,7 @@
               :song/album-name "The Number of the Beast"}
              {:album/length 2259,
               :song/album-name "Iron Maiden"}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate-by :song/album-name {:album/length [+ :song/length]}))))))
 
 (deftest stats-test
@@ -277,7 +277,7 @@
             #:song{:length-stats
                    {:min 202, :max 422, :count 8, :avg #?(:clj 2259/8 :cljs 282.375) :sum 2259},
                    :album-name "Iron Maiden"}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate-by :song/album-name {:song/length-stats [r/stats-agg :song/length]})))))
   (testing "It extends stats"
     (is (= #{#:song{:album-name "Iron Maiden",
@@ -292,7 +292,7 @@
                     :count 8,
                     :avg-length #?(:clj 2351/8 :cljs 293.875),
                     :sum-length 2351}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate-by :song/album-name {:song/length [r/stats-agg :song/length]})
                (r/extend-stats :song/length))))))
 
@@ -314,22 +314,22 @@
              {:song/name "Gangland", :album/length 2351}
              {:song/name "Strange World", :album/length 2259}
              {:song/name "The Number of the Beast", :album/length 2351}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate-over :song/album-name {:album/length [+ :song/length]})
                (r/project [:song/name :album/length]))))))
 
 (deftest aggs-test
   (testing "count-agg"
     (is (= #{{:song/count 16}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate {:song/count r/count-agg})))))
   (testing "set-agg"
     (is (= #{#:album{:names #{"The Number of the Beast" "Iron Maiden"}}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate {:album/names [r/set-agg :song/album-name]})))))
   (testing "vec-agg"
     (is (= #{#:song{:lengths [200 202 223 226 230 236 249 254 265 274 330 334 343 394 422 428]}}
-           (|> (r/relation song)
+           (|> song
                (r/sort-by :song/length)
                (r/aggregate {:song/lengths [r/vec-agg :song/length]}))))))
 
@@ -340,7 +340,7 @@
              #:song{:key :avg, :val #?(:clj 2305/8 :cljs 288.125)}
              #:song{:key :min, :val 200}
              #:song{:key :count, :val 16}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate {:song/length [r/stats-agg :song/length]})
                (r/expand-kv :song/length))))))
 
@@ -358,7 +358,7 @@
                     :count 8,
                     :avg #?(:clj 2351/8 :cljs 293.875),
                     :sum 2351}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate-by :song/album-name {:song/length [r/stats-agg :song/length]})
                (r/extend-kv :song/length))))))
 
@@ -366,7 +366,7 @@
   (testing "It expands seqs"
     (is (= #{#:album{:names "Iron Maiden"}
              #:album{:names "The Number of the Beast"}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate {:album/names [r/set-agg :song/album-name]})
                (r/expand-seq :album/names))))))
 
@@ -378,7 +378,7 @@
              #:song{:name "The Prisoner"}
              #:song{:name "Hallowed Be Thy Name"}
              #:song{:name "Phantom Of the Opera"}}
-           (|> (r/relation song)
+           (|> song
                (r/aggregate-over :song/album-name {:album/song-length [r/stats-agg :song/length]})
                (r/extend-stats :album/song-length)
                (r/extend :song/longer-than-avg?
@@ -392,20 +392,42 @@
   (testing "It normalizes"
     (is (= {:song song
             :artist artist}
-           (-> (r/relation song)
-               (r/join (r/relation artist) {})
+           (-> song
+               (r/join artist {})
                r/normalize))))
   (testing "With missing attributes"
     (is (= {:a #{{:a/key :val}}
             :b #{{:b/key :val}}}
-           (-> (r/relation #{{:a/key :val}})
-               (r/union (r/relation #{{:b/key :val}}))
+           (-> #{{:a/key :val}}
+               (r/union #{{:b/key :val}})
                r/normalize)))))
 
 
 (comment
+  (require '[kixi.stats.core :as stats])
+
+
+
   (|> (r/relation [{:a/k 1} {:a/k 1}])
       (r/aggregate :b [+ :a/k]))
+
+  (clojure.set/join #{{:a/k 1 :common 1}
+                      {:a/k 2 :common 2}}
+                    #{{:b/k 1 :common 2}
+                      {:c 1}
+                      {:c 2}}
+                    {:a/k :b/k})
+
+  (|> (r/relation #{{:a/k 1 :common 1}})
+      (r/join (r/relation #{{:b/k 1 :common 2}}) {:a/k :b/k}))
+
+  (= (|> (r/relation artist)
+         (r/join song {:artist/band-name :song/band-name}))
+     (clojure.set/join artist song {:artist/band-name :song/band-name}))
+
+  (= (|> (r/relation song)
+         (r/join artist {:song/band-name :artist/band-name}))
+     (clojure.set/join song artist {:song/band-name :artist/band-name}))
 
   (let [n 10000]
     (print "relation")

@@ -63,9 +63,9 @@
 
 (defn comp
   ([rel xform]
-   (impl/compose rel xform))
+   (impl/compose (relation rel) xform))
   ([rel xform & xfs]
-   (reduce #(impl/compose %1 %2) rel (cons xform xfs))))
+   (reduce #(impl/compose %1 %2) (relation rel) (cons xform xfs))))
 
 (defn select
   "Selects rows for which (pred row) returns true."
@@ -125,7 +125,7 @@
 
 (defn- join* [yrel kmap merge-fn keep-not-found?]
   (fn [rf]
-    (let [idx (index yrel (vals kmap))]
+    (let [idx (index (relation yrel) (vals kmap))]
       (fn
         ([] (rf))
         ([res] (rf res))
@@ -141,36 +141,35 @@
 (defn- right-precedence [_ b] b)
 
 (defn- flip? [xrel yrel]
-  (if (and
-       (impl/counted? xrel)
-       (impl/counted? yrel))
-    (<= (impl/count xrel) (impl/count yrel))))
+  (let [xrel (relation xrel)
+        yrel (relation yrel)]
+    (and
+     (impl/counted? xrel)
+     (impl/counted? yrel)
+     (<= (impl/count xrel) (impl/count yrel)))))
 
 (defn join
   "Joins relation yrel using the corresponding attributes in kmap.
 
   Keys in yrel will be merged into xrel with yrel taking precedence."
   [xrel yrel kmap]
-  (let [yrel (relation yrel)]
-    (if (flip? xrel yrel)
-      (comp yrel (join* xrel (set/map-invert kmap) left-precedence false))
-      (comp xrel (join* yrel kmap right-precedence false)))))
+  (if (flip? xrel yrel)
+    (comp yrel (join* xrel (set/map-invert kmap) left-precedence false))
+    (comp xrel (join* yrel kmap right-precedence false))))
 
 (defn left-join
   "Same as join but always keeps all rows in xrel"
   [xrel yrel kmap]
-  (let [yrel (relation yrel)]
-    (comp xrel (join* yrel kmap right-precedence true))))
+  (comp xrel (join* yrel kmap right-precedence true)))
 
 (defn right-join
   "Same as join but always keep all rows in yrel"
   [xrel yrel kmap]
-  (let [yrel (relation yrel)]
-    (comp yrel (join* xrel (set/map-invert kmap) left-precedence true))))
+  (comp yrel (join* xrel (set/map-invert kmap) left-precedence true)))
 
 (defn- full-join* [yrel kmap]
   (fn [rf]
-    (let [idx (index yrel (vals kmap))
+    (let [idx (index (relation yrel) (vals kmap))
           used-idx-keys (volatile! #{})]
       (fn
         ([] (rf))
@@ -189,8 +188,7 @@
              (rf res item))))))))
 
 (defn full-join [xrel yrel kmap]
-  (let [yrel (relation yrel)]
-    (comp xrel (full-join* yrel kmap))))
+  (comp xrel (full-join* yrel kmap)))
 
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
@@ -211,7 +209,7 @@
                 aggs
                 aggs-map))))
        (transient {})
-       (seq rel))
+       (seq (relation rel)))
       (persistent!)
       (map (fn [[by row]]
              (merge-with (fn [[agg-fn _] res]
@@ -252,7 +250,7 @@
                (if (zero? by-val)
                  (compare (hash x) (hash y))
                  by-val)))]
-    (relation (into (sorted-set-by by) (impl/entries rel)))))
+    (relation (into (sorted-set-by by) (impl/entries (relation rel))))))
 
 (defn normalize
   "Normalizes a relation.
@@ -284,7 +282,7 @@
            {:kmap {}
             :ks #{}
             :relmap (transient {})}
-           (impl/entries rel))
+           (impl/entries (relation rel)))
    :relmap
    (persistent!)
    (update-vals persistent!)))
@@ -292,12 +290,14 @@
 (defn union
   "Returns a relation that is the union of xrel and yrel."
   [xrel yrel]
-  (relation (into (impl/set yrel) (impl/entries xrel))))
+  (let [xrel (relation xrel)
+        yrel (relation yrel)]
+    (relation (into (impl/set yrel) (impl/entries xrel)))))
 
 (defn difference
   "Returns a relation that is xrel without the elemens in yrel."
   [xrel yrel]
-  (let [yset (impl/set yrel)]
+  (let [yset (impl/set (relation yrel))]
     (if (empty? yset)
       xrel
       (comp xrel (remove (impl/set yrel))))))
@@ -305,7 +305,7 @@
 (defn intersection
   "Returns a relation that is the intersection of xrel and yrel."
   [xrel yrel]
-  (let [yset (impl/set yrel)]
+  (let [yset (impl/set (relation yrel))]
     (if (empty? yset)
       (relation #{})
       (comp xrel (filter yset)))))
@@ -393,3 +393,13 @@
 
   Returns the rowcount."
   [+ (constantly 1)])
+
+
+(comment
+
+  (-> (relation #{{:a 1}})
+      (join (relation #{{:b 1}}) {:a :b})
+      (impl/keys))
+
+
+  nil)

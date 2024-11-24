@@ -28,8 +28,8 @@ Joining
 
 ``` clojure
 
-(-> (r/relation employee)
-    (r/join (r/relation dept) {:dept-name :dept-name})
+(-> employee
+    (r/join dept {:dept-name :dept-name})
     r/set)
     
 => 
@@ -78,8 +78,8 @@ Relation provides a rich set of operations
 And they compose easily like this:
 
 ``` clojure
-(|> (r/relation employee)
-    (r/join (r/relation dept) {:dept-name :dept-name})
+(|> employee
+    (r/join dept {:dept-name :dept-name})
     (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
     (r/update :dept-colleagues count)
     (r/sort-by :emp-id))
@@ -121,7 +121,7 @@ use any of the statistics from [MastodonC/kixi.stats](https://github.com/Mastodo
 ``` clojure
 (require '[kixi.stats.core :as stats])
 
-(|> (r/relation employee)
+(|> employee
     (r/aggregate {:emp-id-stddev [stats/standard-deviation :emp-id]}))
 =>
 #{{:emp-id-stddev 915.1378038306581}}
@@ -136,7 +136,7 @@ Since everything is built on tranducers you can easily add your own steps.
 (def xform
   (map (fn [row] (update row :emp-id #(str "subsidiary-" %)))))
 
-(|> (r/relation employee)
+(|> employee
     (r/comp xform)
     (r/project [:emp-id]))
     
@@ -155,7 +155,7 @@ named operation.
 (defn make-subsidiary [rel]
   (r/comp rel (map (fn [row] (update row :emp-id #(str "subsidiary-" %))))))
 
-(|> (r/relation employee)
+(|> employee
     (r/sort-by :emp-id)
     make-subsidiary
     (r/project [:emp-id]))
