@@ -35,9 +35,6 @@
 (defn compose [rel xform]
   (->Relation (comp (.-xform rel) xform) (.-rel rel)))
 
-(defn keys [rel]
-  (core/keys (first (.-rel rel))))
-
 (defn relation? [x]
   (instance? Relation x))
 

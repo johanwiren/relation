@@ -144,8 +144,7 @@
   (if (and
        (impl/counted? xrel)
        (impl/counted? yrel))
-    (<= (impl/count xrel) (impl/count yrel))
-    (<= (count (impl/keys xrel)) (count (impl/keys yrel)))))
+    (<= (impl/count xrel) (impl/count yrel))))
 
 (defn join
   "Joins relation yrel using the corresponding attributes in kmap.
