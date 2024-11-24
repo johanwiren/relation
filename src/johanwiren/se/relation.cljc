@@ -126,11 +126,12 @@
 (defn- join* [yrel kmap merge-fn kind]
   (fn [rf]
     (let [idx (index (relation yrel) (vals kmap))
-          used-idx-keys (volatile! #{})]
+          used-idx-keys (when (= :full kind)
+                          (volatile! #{}))]
       (fn
         ([] (rf))
         ([res]
-         (if (= :outer kind)
+         (if (= :full kind)
            (let [yitems (->> (apply core/dissoc idx @used-idx-keys)
                              (vals)
                              (apply concat))]
@@ -141,12 +142,12 @@
                found (get idx idx-key)]
            (if found
              (do
-               (when (= :outer kind)
+               (when (= :full kind)
                  (vswap! used-idx-keys conj idx-key))
                (reduce rf res (map #(merge-with merge-fn item %) found)))
-             (if (= :outer kind)
+             (if (#{:full :outer} kind)
                (rf res item)
-               item))))))))
+               res))))))))
 
 (defn- left-precedence [a _] a)
 (defn- right-precedence [_ b] b)
@@ -179,7 +180,7 @@
   (comp yrel (join* xrel (set/map-invert kmap) left-precedence :outer)))
 
 (defn full-join [xrel yrel kmap]
-  (comp xrel (join* yrel kmap right-precedence :outer)))
+  (comp xrel (join* yrel kmap right-precedence :full)))
 
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
