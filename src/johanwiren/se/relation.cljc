@@ -104,6 +104,16 @@
   [rel k f & args]
   (comp rel (map #(apply core/update % k f args))))
 
+(defn project-pred
+  "Keeps only keys matching pred for each row."
+  [rel pred]
+  (comp rel (map #(into {} (filter (core/comp pred key)) %))))
+
+(defn project-ns
+  "Keeps only keys with matching namespace(s)"
+  [rel namespaces]
+  (project-pred rel (core/comp (into #{} (map name) namespaces) namespace)))
+
 (defn project
   "Keeps only keys ks for each row"
   [rel ks]

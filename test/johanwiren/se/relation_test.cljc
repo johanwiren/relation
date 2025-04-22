@@ -432,6 +432,28 @@
                                  {:genre/parent-id :genre/id})
                (r/project [::r/depth :genre/name]))))))
 
+(deftest project-pred
+  (testing "It projects selected keys"
+    (is (= #{#:artist{:name "Steve Harris", :band-name "Iron Maiden"}
+             #:artist{:name "Dave Murray", :band-name "Iron Maiden"}
+             #:artist{:name "Bruce Dickinson", :band-name "Iron Maiden"}
+             #:artist{:name "Nicko McBrain", :band-name "Iron Maiden"}
+             #:artist{:name "Adrian Smith", :band-name "Iron Maiden"}}
+           (|> song
+               (r/join artist {:song/band-name :artist/band-name})
+               (r/project-pred (comp #{"artist"} namespace)))))))
+
+(deftest project-ns
+  (testing "It projects selected namespaces"
+    (is (= #{#:artist{:name "Steve Harris", :band-name "Iron Maiden"}
+             #:artist{:name "Dave Murray", :band-name "Iron Maiden"}
+             #:artist{:name "Bruce Dickinson", :band-name "Iron Maiden"}
+             #:artist{:name "Nicko McBrain", :band-name "Iron Maiden"}
+             #:artist{:name "Adrian Smith", :band-name "Iron Maiden"}}
+           (|> song
+               (r/join artist {:song/band-name :artist/band-name})
+               (r/project-ns ["artist"]))))))
+
 (deftest usecase-test
   (testing "Find the songs on each album longer than the average for that album"
     (is (= #{#:song{:name "22 Acacia Avenue"}
