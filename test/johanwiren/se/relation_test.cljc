@@ -373,7 +373,13 @@
     (is (= #{#:song{:lengths [200 202 223 226 230 236 249 254 265 274 330 334 343 394 422 428]}}
            (|> song
                (r/sort-by :song/length)
-               (r/aggregate {:song/lengths [r/vec-agg :song/length]}))))))
+               (r/aggregate {:song/lengths [r/vec-agg :song/length]})))))
+  (testing "combined agg"
+    (is (= #{{:album/names #{"The Number of the Beast" "Iron Maiden"}
+              :song/count 16}}
+           (|> song
+               (r/aggregate {:album/names [r/set-agg :song/album-name]
+                             :song/count r/count-agg}))))))
 
 (deftest expand-kv-test
   (testing "It expands maps"
