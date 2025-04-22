@@ -151,6 +151,14 @@
                (r/join artist {})
                r/set
                count))))
+  (testing "Empty xrel"
+    (is (= #{}
+           (|> #{}
+               (r/join song {})))))
+  (testing "Empty yrel"
+    (is (= #{}
+           (|> song
+               (r/join #{} {})))))
   (testing "Yrel precedence when merging keys"
     (is (= #{{:b/k 1, :common 2, :a/k 1}}
            (|> #{{:a/k 1 :common 1}}
@@ -190,6 +198,12 @@
              #:artist{:band-name "The White Stripes"}}
            (|> artist
                (r/left-join song {:artist/band-name :song/band-name})
+               (r/project [:artist/band-name])))))
+  (testing "It keeps left rows when joining an empty relation"
+    (is (= #{#:artist{:band-name "Iron Maiden"}
+             #:artist{:band-name "The White Stripes"}}
+           (|> artist
+               (r/left-join #{} {})
                (r/project [:artist/band-name]))))))
 
 (deftest right-join-test
@@ -206,6 +220,12 @@
              #:artist{:band-name "The White Stripes"}}
            (|> song
                (r/right-join artist {:song/band-name :artist/band-name})
+               (r/project [:artist/band-name])))))
+  (testing "It keeps right rows when joining an empty relation"
+    (is (= #{#:artist{:band-name "Iron Maiden"}
+             #:artist{:band-name "The White Stripes"}}
+           (|> #{}
+               (r/right-join artist {})
                (r/project [:artist/band-name]))))))
 
 (deftest full-join-test
