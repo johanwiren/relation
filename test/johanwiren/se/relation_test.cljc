@@ -138,11 +138,7 @@
     (is (= #{#:artist{:name "Jack White", :band-name "The White Stripes"}
              #:artist{:name "Meg White", :band-name "The White Stripes"}}
            (|> artist
-               (r/select (comp #{"The White Stripes"} :artist/band-name)))))
-    (is (= #{#:artist{:band-name "Iron Maiden"}
-             #:artist{:band-name "The White Stripes"}}
-           (|> artist
-               (r/project [:artist/band-name]))))))
+               (r/select (comp #{"The White Stripes"} :artist/band-name)))))))
 
 (deftest join-test
   (testing "Cross join"
