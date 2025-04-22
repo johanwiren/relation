@@ -3,6 +3,16 @@
             [johanwiren.se.relation :as r :refer [|>]])
   #?(:cljs (:require-macros johanwiren.se.relation)))
 
+(def genre #{{:genre/id 0
+              :genre/name "New wave of British heavy metal"
+              :genre/parent-id 1}
+             {:genre/id 1
+              :genre/name "Metal"
+              :genre/parent-id 2}
+             {:genre/id 2
+              :genre/name "Popular"
+              :genre/parent-id nil}})
+
 (def artist #{{:artist/name "Bruce Dickinson" :artist/band-name "Iron Maiden"}
               {:artist/name "Nicko McBrain" :artist/band-name "Iron Maiden"}
               {:artist/name "Steve Harris" :artist/band-name "Iron Maiden"}
@@ -15,81 +25,97 @@
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Prowler"
+                   :genre "New wave of British heavy metal"
                    :length 236}
             #:song{:number 2
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Remember Tomorrow"
+                   :genre "New wave of British heavy metal"
                    :length 330}
             #:song{:number 3
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Running Free"
+                   :genre "New wave of British heavy metal"
                    :length 202}
             #:song {:number 4
                     :band-name "Iron Maiden"
                     :album-name "Iron Maiden"
                     :name "Phantom Of the Opera"
+                   :genre "New wave of British heavy metal"
                     :length 422}
             #:song{:number 5
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Transylvania"
+                   :genre "New wave of British heavy metal"
                    :length 249}
             #:song{:number 6
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Strange World"
+                   :genre "New wave of British heavy metal"
                    :length 343}
             #:song{:number 7
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Charlotte the Harlot"
+                   :genre "New wave of British heavy metal"
                    :length 254}
             #:song{:number 8
                    :band-name "Iron Maiden"
                    :album-name "Iron Maiden"
                    :name "Iron Maiden"
+                   :genre "New wave of British heavy metal"
                    :length 223}
             #:song{:number 1
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "Invaders"
+                   :genre "New wave of British heavy metal"
                    :length 200}
             #:song{:number 2
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "Children of the Damned"
+                   :genre "New wave of British heavy metal"
                    :length 274}
             #:song{:number 3
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "The Prisoner"
+                   :genre "New wave of British heavy metal"
                    :length 334}
             #:song{:number 4
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "22 Acacia Avenue"
+                   :genre "New wave of British heavy metal"
                    :length 394}
             #:song{:number 5
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "The Number of the Beast"
+                   :genre "New wave of British heavy metal"
                    :length 265}
             #:song{:number 6
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "Run to the Hills"
+                   :genre "New wave of British heavy metal"
                    :length 230}
             #:song{:number 7
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "Gangland"
+                   :genre "New wave of British heavy metal"
                    :length 226}
             #:song{:number 8
                    :band-name "Iron Maiden"
                    :album-name "The Number of the Beast"
                    :name "Hallowed Be Thy Name"
+                   :genre "New wave of British heavy metal"
                    :length 428}})
 
 (deftest relation-realisation-test
@@ -385,6 +411,26 @@
            (|> song
                (r/aggregate {:album/names [r/set-agg :song/album-name]})
                (r/expand-seq :album/names))))))
+
+(deftest recursive-join
+  (testing "It joins recursively"
+    (is (= #{{:genre/name "New wave of British heavy metal" ::r/depth 0}
+             {:genre/name "Metal" ::r/depth 1}
+             {:genre/name "Popular" ::r/depth 2}}
+           (|> (r/relation song)
+               (r/recursive-join genre
+                                 {:song/genre :genre/name}
+                                 {:genre/parent-id :genre/id})
+               (r/project [:genre/name ::r/depth])))))
+  (testing "It self joins recursively"
+    (is (= #{{:genre/name "Popular" ::r/depth 1}
+             {:genre/name "Metal" ::r/depth 0}}
+           (|> (r/relation genre)
+               (r/select (comp #{"Metal"} :genre/name))
+               (r/recursive-join genre
+                                 {:genre/name :genre/name}
+                                 {:genre/parent-id :genre/id})
+               (r/project [::r/depth :genre/name]))))))
 
 (deftest usecase-test
   (testing "Find the songs on each album longer than the average for that album"

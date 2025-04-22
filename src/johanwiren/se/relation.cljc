@@ -149,6 +149,39 @@
                (rf res item)
                res))))))))
 
+(defn recursive-join
+  "Joins relation yrel using the corresponding attributes in join-kmap
+  For each found entry in yrel, recursively joins yrel on corresponding
+  attributes in recur-kmap.
+
+  Adds :johanwiren.se.relation/depth to joined entries."
+  [xrel yrel join-kmap recur-kmap]
+  (comp
+   xrel
+   (fn [rf]
+     (let [join-idx (index (relation yrel) (vals join-kmap))
+           join-ks (keys join-kmap)
+           rec-idx (index (relation yrel) (vals recur-kmap))
+           rec-ks (keys recur-kmap)]
+       (fn
+         ([] (rf))
+         ([res] (rf res))
+         ([res item]
+          (let [join-idx-key (set/rename-keys (select-keys item join-ks) join-kmap)
+                join-found (get join-idx join-idx-key)
+                level 0]
+            (loop [res (reduce rf res (map #(merge item % {::depth level}) join-found))
+                   level (inc level)
+                   items join-found]
+              (if (core/seq items)
+                (let [idx-key (set/rename-keys (select-keys (first items) rec-ks) recur-kmap)
+                      found (get rec-idx idx-key)]
+                  (recur
+                   (reduce rf res (map #(merge item % {::depth level}) found))
+                   (inc level)
+                   (into (rest items) found)))
+                res)))))))))
+
 (defn- left-precedence [a _] a)
 (defn- right-precedence [_ b] b)
 
