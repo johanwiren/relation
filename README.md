@@ -29,7 +29,7 @@ Joining
 ``` clojure
 
 (-> employee
-    (r/join dept {:dept-name :dept-name})
+    (r/join dept {:dept-name :name})
     r/set)
     
 => 
@@ -79,7 +79,7 @@ And they compose easily like this:
 
 ``` clojure
 (|> employee
-    (r/join dept {:dept-name :dept-name})
+    (r/join dept {:dept-name :name})
     (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
     (r/update :dept-colleagues count)
     (r/sort-by :emp-id))
