@@ -5,7 +5,7 @@
   namespace which composes a transducing process that often yields
   better perfomance than using the corresponding functions in clojure.set
 
-  To realise a the composed process, use either set or seq"
+  To realise the composed process, use either set or seq"
   (:require
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
@@ -137,7 +137,8 @@
   (fn [rf]
     (let [idx (index (relation yrel) (vals kmap))
           used-idx-keys (when (= :full kind)
-                          (volatile! #{}))]
+                          (volatile! #{}))
+          ks (keys kmap)]
       (fn
         ([] (rf))
         ([res]
@@ -148,7 +149,7 @@
              (rf (reduce rf res yitems)))
            (rf res)))
         ([res item]
-         (let [idx-key (set/rename-keys (select-keys item (keys kmap)) kmap)
+         (let [idx-key (set/rename-keys (select-keys item ks) kmap)
                found (get idx idx-key)]
            (if found
              (do
@@ -288,7 +289,7 @@
   agg-fn must be a reducing function with an additional zero arity function
   that produces an initial value.
 
-  Example: (aggregate-by rel {:album/length [+ :song/length]})"
+  Example: (aggregate rel {:album/length [+ :song/length]})"
   ([rel aggs-map]
    (aggregate-by rel [] aggs-map))
   ([rel key agg & more]
