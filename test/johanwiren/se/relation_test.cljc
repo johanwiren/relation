@@ -205,7 +205,13 @@
     (is (= #{#:artist{:band-name "Iron Maiden"}}
            (|> artist
                (r/join song {:artist/band-name :song/band-name})
-               (r/project [:artist/band-name]))))))
+               (r/project [:artist/band-name])))))
+  (testing "It self joins"
+    (is (= #{{:genre/name "Metal", :parent/name "Popular"}
+             {:genre/name "New wave of British heavy metal", :parent/name "Metal"}}
+           (|> genre
+               (r/join :self/parent {:parent/id :genre/parent-id})
+               (r/project [:genre/name :parent/name]))))))
 
 (deftest left-join-test
   (testing "It joins rows"

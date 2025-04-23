@@ -203,27 +203,44 @@
      (impl/counted? yrel)
      (<= (impl/count xrel) (impl/count yrel)))))
 
+(defn- flip [f]
+  (fn [a b]
+    (f b a)))
+
 (defn join
   "Joins relation yrel using the corresponding attributes in kmap.
 
   Keys in yrel will be merged into xrel with yrel taking precedence."
-  [xrel yrel kmap]
-  (if (flip? xrel yrel)
-    (comp yrel (join* xrel (set/map-invert kmap) left-precedence :inner))
-    (comp xrel (join* yrel kmap right-precedence :inner))))
+  ([xrel yrel kmap]
+   (join xrel yrel kmap right-precedence :inner))
+  ([xrel yrel kmap precedence kind]
+   (cond
+     (and (qualified-keyword? yrel)
+          (= "self" (namespace yrel)))
+     (let [namespace (name yrel)]
+       (-> xrel
+           (comp (map #(update-keys % (core/comp (partial keyword namespace) name))))
+           (join xrel kmap precedence kind)))
+
+     (and (= :innner kind)
+          (flip? xrel yrel))
+     (comp yrel (join* xrel (set/map-invert kmap) (flip precedence) kind))
+
+     :else
+     (comp xrel (join* yrel kmap precedence kind)))))
 
 (defn left-join
   "Same as join but always keeps all rows in xrel"
   [xrel yrel kmap]
-  (comp xrel (join* yrel kmap right-precedence :outer)))
+  (join xrel yrel kmap right-precedence :outer))
 
 (defn right-join
   "Same as join but always keep all rows in yrel"
   [xrel yrel kmap]
-  (comp yrel (join* xrel (set/map-invert kmap) left-precedence :outer)))
+  (join yrel xrel (set/map-invert kmap) left-precedence :outer))
 
 (defn full-join [xrel yrel kmap]
-  (comp xrel (join* yrel kmap right-precedence :full)))
+  (join xrel yrel kmap right-precedence :full))
 
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
