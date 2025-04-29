@@ -1,4 +1,4 @@
-(ns johanwiren.se.relation
+(ns johanwiren.relation
   "(Somewhat) composeable Relational algebra operations.
 
   A relation that can be threaded through most operations in this
@@ -10,7 +10,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set]
-   [johanwiren.se.relation.impl :as impl])
+   [johanwiren.relation.impl :as impl])
   (:refer-clojure :exclude [assoc comp dissoc set seq update extend update sort-by vec]))
 
 (defmacro |>
@@ -165,7 +165,7 @@
   For each found entry in yrel, recursively joins yrel on corresponding
   attributes in recur-kmap.
 
-  Adds :johanwiren.se.relation/depth to joined entries."
+  Adds :johanwiren.relation/depth to joined entries."
   [xrel yrel join-kmap recur-kmap]
   (comp
    xrel

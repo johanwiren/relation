@@ -1,4 +1,4 @@
-(ns johanwiren.se.relation.impl
+(ns johanwiren.relation.impl
   #?(:clj (:require [clojure.core :as core])
      :cljs (:require [cljs.core :as core]))
   (:refer-clojure :exclude [keys set seq count vec counted?]))

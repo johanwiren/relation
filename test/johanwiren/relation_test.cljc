@@ -1,7 +1,7 @@
-(ns johanwiren.se.relation-test
+(ns johanwiren.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.se.relation :as r :refer [|>]])
-  #?(:cljs (:require-macros johanwiren.se.relation)))
+            [johanwiren.relation :as r :refer [|>]])
+  #?(:cljs (:require-macros johanwiren.relation)))
 
 (def genre #{{:genre/id 0
               :genre/name "New wave of British heavy metal"
@@ -497,19 +497,28 @@
             :artist artist}
            (-> song
                (r/join artist {})
-               r/normalize))))
-  (testing "With missing attributes"
-    (is (= {:a #{{:a/key :val}}
-            :b #{{:b/key :val}}}
-           (-> #{{:a/key :val}}
-               (r/union #{{:b/key :val}})
                r/normalize)))))
 
 
 (comment
-  (require '[kixi.stats.core :as stats])
+  (require '[kixi.stats.core :as stats]
+           '[clojure.set :as s])
 
 
+
+  (def test-rel
+    (let [n 200000]
+      (map (fn [i] {:a i
+                    :b (rand-int n)
+                    :c (rand-int n)
+                    :d (rand-int n)})
+           (range n))))
+
+  (time
+   (count (|> test-rel (r/join test-rel {:b :c}))))
+
+  (time
+   (count (s/join test-rel test-rel {:b :c})))
 
   (|> (r/relation [{:a/k 1} {:a/k 1}])
       (r/aggregate :b [+ :a/k]))
@@ -520,6 +529,12 @@
                       {:c 1}
                       {:c 2}}
                     {:a/k :b/k})
+
+  (clojure.set/join #{{:a/a 1 :a/b 1}}
+                    #{{:a/a 1 :a/c 1}} {:a/a :a/a})
+
+  (|> #{{:a/a 1 :a/b 1}}
+      (r/join #{{:a/a 1 :a/c 1}} {:a/a :a/a}))
 
   (|> (r/relation #{{:a/k 1 :common 1}})
       (r/join (r/relation #{{:b/k 1 :common 2}}) {:a/k :b/k}))
@@ -532,24 +547,43 @@
          (r/join artist {:song/band-name :artist/band-name}))
      (clojure.set/join song artist {:song/band-name :artist/band-name}))
 
-  (let [n 10000]
-    (print "relation")
-    (time
-     (dotimes [_ n]
-       (|> (r/relation song)
-           (r/join (r/relation artist) {:song/band-name :artist/band-name})
-           (r/project [:artist/band-name])
-           (r/join (r/relation song) {:artist/band-name :song/band-name}))
-       nil))
+  (|> artist
+      (r/comp (#'r/join* (r/relation song) {:artist/band-name :song/band-name} #'r/right-precedence :inner)))
 
-    (print "clojure.set")
+  (let [n 1000]
+    (print "clojure.set ")
     (time
      (dotimes [_ n]
        (-> song
-           (clojure.set/join artist {:song/band-name :artist/band-name})
-           (clojure.set/project [:artist/band-name])
-           (clojure.set/join song {:artist/band-name :song/band-name}))
+           (s/join artist {:song/band-name :artist/band-name})
+           (s/join song {:artist/band-name :song/band-name})
+           (s/project [:artist/band-name])
+           (->> (sort-by :artist/band-name)))
+       nil))
+
+    (print "relation ")
+    (time
+     (dotimes [_ n]
+       (|> song
+           (r/join artist {:song/band-name :artist/band-name})
+           (r/join song {:artist/band-name :song/band-name})
+           (r/project [:artist/band-name])
+           (r/sort-by :artist/band-name))
        nil)))
+
+  (require '[criterium.core :as c])
+
+  (c/quick-bench
+      (-> song
+          (s/join artist {:song/band-name :artist/band-name})
+          (s/project [:artist/band-name])
+          (->> (sort-by :artist/band-name))))
+
+  (c/quick-bench
+      (|> song
+          (r/join artist {:song/band-name :artist/band-name})
+          (r/project [:artist/band-name])
+          (r/sort-by :artist/band-name)))
 
   (|> (r/relation song)
       (r/join (r/relation artist) {:song/band-name :artist/band-name})
@@ -557,7 +591,60 @@
                                         :album/artists [r/set-agg :artist/name]}))
 
   (|> (r/relation #{{:a 1} {:a 2}})
-      (r/assoc :a 2)
-      (r/aggregate {:a/sum [+ :a]}))
+      (r/assoc :mohah/key 32 :hih/a 1)
+      #_(r/dissoc :hih/a))
+
+
+
+  ;; Integrates wonderfully with kixi stats
+  (|> (r/relation song)
+      (r/aggregate-by :song/album-name {:album/song-length [r/stats-agg :song/length]
+                                        :album/song-lengths [r/vec-agg :song/length]
+                                        :album/variance-length [stats/variance-p :song/length]
+                                        :test/max [+ :song/length]})
+      #_(r/extend-kv :album/song-length)
+      #_(r/expand-seq :album/song-lengths))
+  
+
+  (|> (r/relation song)
+      (r/comp (map :song/length)
+              (map inc)))
+
+  (|> (r/relation #{{:tree-node 3 :some-key :val}
+                    {:tree-node 2 :some-other-key :val}})
+      (r/recursive-join #{{:node 1 :parent 0}
+                          {:node 2 :parent 1}
+                          {:node 3 :parent 2}}
+                        {:tree-node :node}
+                        {:parent :node}))
+
+  #{:apa}
+
+  (compare (hash 42) (hash ""))
 
   nil)
+
+
+(def employee #{{:emp/name "Harry" :emp/id 3415 :emp/dept-name "Finance"}
+                {:emp/name "Sally" :emp/id 2241 :emp/dept-name "Sales"}
+                {:emp/name "George" :emp/id 3401 :emp/dept-name "Finance"}
+                {:emp/name "Harriet" :emp/id 2202 :emp/dept-name "Sales"}
+                {:emp/name "Mary" :emp/id 1257 :emp/dept-name "Human Resources"}})
+
+(def dept #{{:dept/name "Finance" :dept/manager "George"}
+            {:dept/name "Sales" :dept/manager "Harriet"}
+            {:dept/name "Production" :dept/manager "Charles"}})
+
+
+(comment
+  (-> employee
+      (r/join dept {:emp/dept-name :dept/name})
+      (r/project [:emp/name :dept/manager :emp/id])
+      (r/rename {:dept/manager :emp/manager})
+      (r/join :self/mgr {:mgr/name :emp/manager})
+      (r/project-pred (comp #{"name" "id"} name))
+      r/set)
+
+  nil)
+
+:a
