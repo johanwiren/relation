@@ -10,7 +10,7 @@ Well "fast" as in not slower than clojure.set ..
 ## Usage
 
 ``` clojure
-(require '[johanwiren.se.relation :as r])
+(require '[johanwiren.relation :as r])
 
 (def employee #{{:name "Harry" :emp-id 3415 :dept-name "Finance"}
                 {:name "Sally" :emp-id 2241 :dept-name "Sales"}
@@ -64,6 +64,9 @@ Relation provides a rich set of operations
 * join
 * left-join
 * right-join
+* full-join
+* recursive-join
+* anti-join
 * aggregate-by
 * aggregate-over
 * aggregate
