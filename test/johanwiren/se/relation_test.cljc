@@ -277,6 +277,13 @@
                (r/full-join artist {:song/band-name :artist/band-name})
                (r/project [:artist/band-name]))))))
 
+(deftest anti-join
+  (testing "It keeps entries not in right"
+    (is (= #{#:artist{:name "Jack White", :band-name "The White Stripes"}
+             #:artist{:name "Meg White", :band-name "The White Stripes"}}
+           (|> artist
+               (r/anti-join song {:artist/band-name :song/band-name}))))))
+
 (deftest sort-by-test
   (testing "It sorts"
     (let [rel (-> artist

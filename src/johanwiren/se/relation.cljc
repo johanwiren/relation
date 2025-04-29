@@ -243,6 +243,11 @@
 (defn full-join [xrel yrel kmap]
   (join xrel yrel kmap right-precedence :full))
 
+(defn anti-join [xrel yrel kmap]
+  (-> xrel
+      (left-join yrel kmap)
+      (select (apply every-pred (map #(core/comp nil? %) (vals kmap))))))
+
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
   aggs-map should be a map from key to a vector of agg-fn, key-fn.
