@@ -6,36 +6,36 @@
    [clojure.set :as set])
   (:refer-clojure :exclude [assoc dissoc update extend update sort-by]))
 
-(defmacro |>
+(defn |>
   [relation & xforms]
-  `(into (empty ~relation) (comp ~@xforms) ~relation))
+  (into (empty relation) (reduce comp xforms) relation))
 
-(defmacro |>seq
+(defn |>seq
   [relation & xforms]
-  `(sequence (comp ~@xforms) ~relation))
+  (sequence (reduce comp xforms) relation))
 
-(defmacro |>set
+(defn |>set
   [relation & xforms]
-  `(into #{} (comp ~@xforms) ~relation))
+  (into #{} (reduce comp xforms) relation))
 
-(defmacro |>vec
+(defn |>vec
   [relation & xforms]
-  `(into [] (comp ~@xforms) ~relation))
+  (into [] (reduce comp xforms) relation))
 
 (defn- --first
   ([] nil)
   ([x] x)
   ([_ x] (reduced x)))
 
-(defmacro |>first
+(defn |>first
   [relation & xforms]
-  `(transduce (comp ~@xforms)
-              #'--first
-              ~relation))
+  (transduce (reduce comp xforms) --first relation))
 
-(defmacro |>normalized
+(declare normalize)
+
+(defn |>normalized
   [relation & forms]
-  `(transduce (comp ~@forms) #'normalize ~relation))
+  (transduce (reduce comp forms) normalize relation))
 
 (defn select
   "Selects rows for which (pred row) returns true."
