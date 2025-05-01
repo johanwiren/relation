@@ -7,22 +7,18 @@
   (:refer-clojure :exclude [assoc dissoc update extend update sort-by]))
 
 (defmacro |>
-  {:clj-kondo/ignore true}
   [relation & xforms]
   `(into (empty ~relation) (comp ~@xforms) ~relation))
 
 (defmacro |>seq
-  {:clj-kondo/ignore true}
   [relation & xforms]
-  `(sequnce (comp ~@xforms) ~relation))
+  `(sequence (comp ~@xforms) ~relation))
 
 (defmacro |>set
-  {:clj-kondo/ignore true}
   [relation & xforms]
   `(into #{} (comp ~@xforms) ~relation))
 
 (defmacro |>vec
-  {:clj-kondo/ignore true}
   [relation & xforms]
   `(into [] (comp ~@xforms) ~relation))
 
