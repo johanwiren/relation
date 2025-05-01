@@ -85,28 +85,43 @@ And they compose easily like this:
     (r/update :dept-colleagues count)
     (r/sort-by :emp-id))
 
-=> ({:name "Sales",
-     :emp-id 2202,
-     :dept-name "Sales",
-     :manager "Harriet",
-     :dept-colleagues 2}
-    {:name "Sales",
-     :emp-id 2241,
-     :dept-name "Sales",
-     :manager "Harriet",
-     :dept-colleagues 2}
-    {:name "Finance",
-     :emp-id 3401,
-     :dept-name "Finance",
-     :manager "George",
-     :dept-colleagues 2}
-    {:name "Finance",
-     :emp-id 3415,
-     :dept-name "Finance",
-     :manager "George",
-     :dept-colleagues 2})
+=> #{{:name "Finance",
+      :emp-id 3415,
+      :dept-name "Finance",
+      :manager "George",
+      :dept-colleagues 2}
+     {:name "Sales",
+      :emp-id 2202,
+      :dept-name "Sales",
+      :manager "Harriet",
+      :dept-colleagues 2}
+     {:name "Finance",
+      :emp-id 3401,
+      :dept-name "Finance",
+      :manager "George",
+      :dept-colleagues 2}
+     {:name "Sales",
+      :emp-id 2241,
+      :dept-name "Sales",
+      :manager "Harriet",
+      :dept-colleagues 2}}
 
 ```
+
+They're just transducers though so they fit into any transducing process. There is no need to use the |>* macros.
+
+The snippet above expands to:
+
+```clojure
+(into (empty employee) ;; Maintains the return type
+      (comp (r/join dept {:dept-name :name})
+            (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
+            (r/update :dept-colleagues count)
+            (r/sort-by :emp-id))
+      employee)
+
+```
+
 
 ### Aggregations
 
@@ -129,7 +144,7 @@ All aggregations are transducing functions which means that we can easily use an
 
 ### Extending
 
-The `|>`, `|>set`, `|>vec`, `|>normalized` macros compose a transducing process so each step can be exteded using any transducer.
+The `|>`, `|>seq`, `|>set`, `|>vec`, `|>normalized` macros compose a transducing process so each step can be exteded using any transducer.
 
 ``` clojure
 
