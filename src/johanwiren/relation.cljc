@@ -1,11 +1,5 @@
 (ns johanwiren.relation
-  "(Somewhat) composeable Relational algebra operations.
-
-  A relation that can be threaded through most operations in this
-  namespace which composes a transducing process that often yields
-  better perfomance than using the corresponding functions in clojure.set
-
-  To realise the composed process, use either set or seq"
+  "Composeable Relational algebra operations."
   (:require
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
@@ -15,7 +9,12 @@
 (defmacro |>
   {:clj-kondo/ignore true}
   [relation & xforms]
-  `(sequence (comp ~@xforms) ~relation))
+  `(into (empty ~relation) (comp ~@xforms) ~relation))
+
+(defmacro |>seq
+  {:clj-kondo/ignore true}
+  [relation & xforms]
+  `(sequnce (comp ~@xforms) ~relation))
 
 (defmacro |>set
   {:clj-kondo/ignore true}
@@ -441,12 +440,3 @@
   Returns the rowcount."
   [+ (constantly 1)])
 
-
-(comment
-
-  (-> (relation #{{:a 1}})
-      (join (relation #{{:b 1}}) {:a :b})
-      (impl/keys))
-
-
-  nil)
