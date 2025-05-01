@@ -1,16 +1,27 @@
 # Relation
 
-## Rationale
+Simple relational algebra expressions for Clojure and ClojureScript.
 
-Relational algebra in Clojure should be easy, fast and composable.
-And it should work for both clojure and clojurescript.
+Builds entirely on transducers and can be extended as such.
 
-Well "fast" as in not slower than clojure.set ..
+## Status
+
+Experimental, use at your own risk. Things will probably change.
+
+## Performance
+
+There is no optimizer, so ensuring optimal performance is up to the caller.
+
+## Uniqueness
+
+Similarly to SQL, Relation will not guarantee uniqueness, except
+`union`, `intersection`, `difference` and `|>set`. It is up to the caller to
+insert `(distinct)` operations where needed for uniqueness.
 
 ## Usage
 
 ``` clojure
-(require '[johanwiren.relation :as r])
+(require '[johanwiren.relation :as r :refer [|>]])
 
 (def employee #{{:name "Harry" :emp-id 3415 :dept-name "Finance"}
                 {:name "Sally" :emp-id 2241 :dept-name "Sales"}
@@ -28,27 +39,15 @@ Joining
 
 ``` clojure
 
-(-> employee
-    (r/join dept {:dept-name :name})
-    r/set)
-    
-=> 
-#{{:name "George", :emp-id 3401, :dept-name "Finance", :manager "George"}
-  {:name "Harriet", :emp-id 2202, :dept-name "Sales", :manager "Harriet"}
-  {:name "Harry", :emp-id 3415, :dept-name "Finance", :manager "George"}
-  {:name "Sally", :emp-id 2241, :dept-name "Sales", :manager "Harriet"}}
+(|> employee
+    (r/join dept {:dept-name :name}))
+
+=> ({:name "Finance", :emp-id 3415, :dept-name "Finance", :manager "George"}
+    {:name "Sales", :emp-id 2241, :dept-name "Sales", :manager "Harriet"}
+    {:name "Sales", :emp-id 2202, :dept-name "Sales", :manager "Harriet"}
+    {:name "Finance", :emp-id 3401, :dept-name "Finance", :manager "George"})
 
 ```
-
-Note that we're using `->` to thread the relation in first position.
-This gives us more options for expressing further operations.
-
-Under the hood relation uses a reducing process and composes most
-operations as a transducer. That is why we need the `r/set` in the
-end so that relation knows what to return.
-
-There is a shorthand macro `|>` that works like `->` and inserts the
-`r/set` in the end for you
 
 ### Operations
 
@@ -61,7 +60,7 @@ Relation provides a rich set of operations
 * extend
 * update
 * project
-* join
+* join (including self-join)
 * left-join
 * right-join
 * full-join
@@ -72,6 +71,7 @@ Relation provides a rich set of operations
 * aggregate
 * sort-by
 * union
+* union-all
 * difference
 * intersection
 * extend-kv
@@ -86,33 +86,34 @@ And they compose easily like this:
     (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
     (r/update :dept-colleagues count)
     (r/sort-by :emp-id))
-=>
-#{{:name "Harriet",
-   :emp-id 2202,
-   :dept-name "Sales",
-   :manager "Harriet",
-   :dept-colleagues 2}
-  {:name "Sally",
-   :emp-id 2241,
-   :dept-name "Sales",
-   :manager "Harriet",
-   :dept-colleagues 2}
-  {:name "George",
-   :emp-id 3401,
-   :dept-name "Finance",
-   :manager "George",
-   :dept-colleagues 2}
-  {:name "Harry",
-   :emp-id 3415,
-   :dept-name "Finance",
-   :manager "George",
-   :dept-colleagues 2}}
+
+=> ({:name "Sales",
+     :emp-id 2202,
+     :dept-name "Sales",
+     :manager "Harriet",
+     :dept-colleagues 2}
+    {:name "Sales",
+     :emp-id 2241,
+     :dept-name "Sales",
+     :manager "Harriet",
+     :dept-colleagues 2}
+    {:name "Finance",
+     :emp-id 3401,
+     :dept-name "Finance",
+     :manager "George",
+     :dept-colleagues 2}
+    {:name "Finance",
+     :emp-id 3415,
+     :dept-name "Finance",
+     :manager "George",
+     :dept-colleagues 2})
+
 ```
 
 ### Aggregations
 
 As seen in the example we can aggregate relations. Relation
-comes with a few build in aggregation functions:
+comes with a few built in aggregation functions:
 
 * set-agg - Aggregates values into a set
 * vec-agg - Aggregates values into a vector
@@ -126,46 +127,26 @@ use any of the statistics from [MastodonC/kixi.stats](https://github.com/Mastodo
 
 (|> employee
     (r/aggregate {:emp-id-stddev [stats/standard-deviation :emp-id]}))
-=>
-#{{:emp-id-stddev 915.1378038306581}}
+
+=> ({:emp-id-stddev 915.1378038306581})
 ```
 
 ### Extending
 
-Since everything is built on tranducers you can easily add your own steps.
+The `|>` macros compose a transducing process so each step can be exteded using
+any transducer.
 
 ``` clojure
 
-(def xform
-  (map (fn [row] (update row :emp-id #(str "subsidiary-" %)))))
-
 (|> employee
-    (r/comp xform)
-    (r/project [:emp-id]))
-    
-=>
-#{{:emp-id "subsidiary-2241"}
-  {:emp-id "subsidiary-3415"}
-  {:emp-id "subsidiary-2202"}
-  {:emp-id "subsidiary-1257"}
-  {:emp-id "subsidiary-3401"}}
-```
-
-Or use `r/comp` which most of relation's operations are built upon to make your own
-named operation.
-
-``` clojure
-(defn make-subsidiary [rel]
-  (r/comp rel (map (fn [row] (update row :emp-id #(str "subsidiary-" %))))))
-
-(|> employee
-    (r/sort-by :emp-id)
-    make-subsidiary
+    ;; Any normal transducer works here
+    (filter (comp odd? :emp-id))
+    ;; And here..
+    (map (fn [row] (update row :emp-id #(str "subsidiary-" %))))
     (r/project [:emp-id]))
 
-#{{:emp-id "subsidiary-1257"}
-  {:emp-id "subsidiary-2202"}
-  {:emp-id "subsidiary-2241"}
-  {:emp-id "subsidiary-3401"}
-  {:emp-id "subsidiary-3415"}}
+=> ({:emp-id "subsidiary-3415"}
+    {:emp-id "subsidiary-1257"}
+    {:emp-id "subsidiary-2241"}
+    {:emp-id "subsidiary-3401"})
 ```

@@ -9,140 +9,102 @@
   (:require
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
-   [clojure.set :as set]
-   [johanwiren.relation.impl :as impl])
-  (:refer-clojure :exclude [assoc comp dissoc set seq update extend update sort-by vec]))
+   [clojure.set :as set])
+  (:refer-clojure :exclude [assoc dissoc update extend update sort-by]))
 
 (defmacro |>
-  "Convenience threading macro similar to -> that realises into a set."
-  {:clj-kondo/lint-as 'clojure.core/->}
-  [& forms]
-  `(impl/set (-> ~@forms)))
+  {:clj-kondo/ignore true}
+  [relation & xforms]
+  `(sequence (comp ~@xforms) ~relation))
 
-(defn relation? [x]
-  (impl/relation? x))
+(defmacro |>set
+  {:clj-kondo/ignore true}
+  [relation & xforms]
+  `(into #{} (comp ~@xforms) ~relation))
 
-(defn relation
-  "Creates a relation.
-  rel should be a set/sequence of maps."
-  [rel]
-  (cond
-    (relation? rel)
-    rel
+(defmacro |>vec
+  {:clj-kondo/ignore true}
+  [relation & xforms]
+  `(into [] (comp ~@xforms) ~relation))
 
-    (and (seqable? rel)
-         (empty? rel))
-    (impl/->Relation identity #{})
-
-    (and (set? rel)
-         (map? (first rel)))
-    (impl/->Relation identity rel)
-
-    (and (seqable? rel)
-         (map? (first rel)))
-    (impl/->Relation identity (core/set rel))
-
-    :else
-    (throw (#?(:clj IllegalArgumentException. :cljs js/Error.)
-            "Relations must be a set/seq of maps"))))
-
-(defn vec
-  "Realises into a (distinct) vector"
-  [rel]
-  (impl/vec rel))
-
-(defn seq
-  "Realises into a (distinct) sequence."
-  [rel]
-  (impl/seq rel))
-
-(defn set
-  "Realises into a set."
-  [rel]
-  (impl/set rel))
-
-(defn comp
-  ([rel xform]
-   (impl/compose (relation rel) xform))
-  ([rel xform & xfs]
-   (reduce #(impl/compose %1 %2) (relation rel) (cons xform xfs))))
+(defmacro |>normalized
+  [relation & forms]
+  `(transduce (comp ~@forms) #'normalize ~relation))
 
 (defn select
   "Selects rows for which (pred row) returns true."
-  [rel pred]
-  (comp rel (filter pred)))
+  [pred]
+  (filter pred))
 
 (defn assoc
   "Associates key(s) and val(s) to all rows."
-  [rel key val & kvs]
-  (comp rel (map #(apply core/assoc % key val kvs))))
+  [key val & kvs]
+  (map #(apply core/assoc % key val kvs)))
 
 (defn dissoc
   "Disassociates key(s) from all rows."
-  [rel key & keys]
-  (comp rel (map #(apply core/dissoc % key keys))))
+  [key & keys]
+  (map #(apply core/dissoc % key keys)))
 
 (defn rename
   "Renames keys on all rows using kmap."
-  [rel kmap]
-  (comp rel (map #(set/rename-keys % kmap))))
+  [kmap]
+  (map #(set/rename-keys % kmap)))
 
 (defn extend
   "Associates k to each row with the value of (f row)"
-  ([rel kmap]
-   (comp rel (map #(reduce-kv (fn [tuple k f]
-                                   (core/assoc tuple k (f tuple)))
-                                 %
-                                 kmap))))
-  ([rel k f]
-   (comp rel (map #(core/assoc % k (f %)))))
-  ([rel k f & kfs]
-   (extend rel (apply hash-map k f kfs))))
+  ([kmap]
+   (map #(reduce-kv (fn [tuple k f]
+                      (core/assoc tuple k (f tuple)))
+                    %
+                    kmap)))
+  ([k f]
+   (map #(core/assoc % k (f %))))
+  ([k f & kfs]
+   (extend (apply hash-map k f kfs))))
 
 (defn update
   "Updates k in each row with the rusult of applying f to the old value."
-  [rel k f & args]
-  (comp rel (map #(apply core/update % k f args))))
+  [k f & args]
+  (map #(apply core/update % k f args)))
 
 (defn project-pred
   "Keeps only keys matching pred for each row."
-  [rel pred]
-  (comp rel (map #(into {} (filter (core/comp pred key)) %))))
+  [pred]
+  (map #(into {} (filter (comp pred key)) %)))
 
 (defn project-ns
   "Keeps only keys with matching namespace(s)"
-  [rel namespaces]
-  (project-pred rel (core/comp (into #{} (map name) namespaces) namespace)))
+  [namespaces]
+  (project-pred (comp (into #{} (map name) namespaces) namespace)))
 
 (defn project
   "Keeps only keys ks for each row"
-  [rel ks]
-  (comp rel (map #(select-keys % ks))))
+  [ks]
+  (map #(select-keys % ks)))
 
-(defn index
-  "Returns a map of distinct values for ks to distinct rows for those values.
-
-  Realises rel."
+(defn- index
+  "Returns a map of distinct values for ks to distinct rows for those values."
   [rel ks]
   (->
    (reduce (fn [acc x]
              (let [idx-key (select-keys x ks)]
-               (core/assoc! acc idx-key (conj! (get acc idx-key (transient #{})) x))))
+               (assoc! acc idx-key (conj! (get acc idx-key (transient #{})) x))))
            (transient {})
-           (impl/entries rel))
+           rel)
    persistent!
    (update-vals persistent!)))
 
-(defn- join* [yrel kmap merge-fn kind]
+(defn- join* [yrel kmap kind]
   (fn [rf]
-    (let [idx (index (relation yrel) (vals kmap))
-          used-idx-keys (when (= :full kind)
+    (let [idx (index yrel (vals kmap))
+          used-idx-keys (when (#{:full :right} kind)
                           (volatile! #{}))
           ks (keys kmap)]
       (fn
         ([] (rf))
         ([res]
-         (if (= :full kind)
+         (if (#{:full :right} kind)
            (let [yitems (->> (apply core/dissoc idx @used-idx-keys)
                              (vals)
                              (apply concat))]
@@ -153,10 +115,10 @@
                found (get idx idx-key)]
            (if found
              (do
-               (when (= :full kind)
+               (when (#{:full :right} kind)
                  (vswap! used-idx-keys conj idx-key))
-               (reduce rf res (map #(merge-with merge-fn item %) found)))
-             (if (#{:full :outer} kind)
+               (reduce rf res (map #(merge item %) found)))
+             (if (#{:full :outer :right} kind)
                (rf res item)
                res))))))))
 
@@ -166,127 +128,152 @@
   attributes in recur-kmap.
 
   Adds :johanwiren.relation/depth to joined entries."
-  [xrel yrel join-kmap recur-kmap]
-  (comp
-   xrel
-   (fn [rf]
-     (let [join-idx (index (relation yrel) (vals join-kmap))
-           join-ks (keys join-kmap)
-           rec-idx (index (relation yrel) (vals recur-kmap))
-           rec-ks (keys recur-kmap)]
-       (fn
-         ([] (rf))
-         ([res] (rf res))
-         ([res item]
-          (let [join-idx-key (set/rename-keys (select-keys item join-ks) join-kmap)
-                join-found (get join-idx join-idx-key)
-                level 0]
-            (loop [res (reduce rf res (map #(merge item % {::depth level}) join-found))
-                   level (inc level)
-                   items join-found]
-              (if (core/seq items)
-                (let [idx-key (set/rename-keys (select-keys (first items) rec-ks) recur-kmap)
-                      found (get rec-idx idx-key)]
-                  (recur
-                   (reduce rf res (map #(merge item % {::depth level}) found))
-                   (inc level)
-                   (into (rest items) found)))
-                res)))))))))
+  [yrel join-kmap recur-kmap]
+  (fn [rf]
+    (let [join-idx (index yrel (vals join-kmap))
+          join-ks (keys join-kmap)
+          rec-idx (index yrel (vals recur-kmap))
+          rec-ks (keys recur-kmap)]
+      (fn
+        ([] (rf))
+        ([res] (rf res))
+        ([res item]
+         (let [join-idx-key (set/rename-keys (select-keys item join-ks) join-kmap)
+               join-found (get join-idx join-idx-key)
+               level 0]
+           (loop [res (reduce rf res (map #(merge item % {::depth level}) join-found))
+                  level (inc level)
+                  items join-found]
+             (if (seq items)
+               (let [idx-key (set/rename-keys (select-keys (first items) rec-ks) recur-kmap)
+                     found (get rec-idx idx-key)]
+                 (recur
+                  (reduce rf res (map #(merge item % {::depth level}) found))
+                  (inc level)
+                  (into (rest items) found)))
+               res))))))))
 
-(defn- left-precedence [a _] a)
-(defn- right-precedence [_ b] b)
-
-(defn- flip? [xrel yrel]
-  (let [xrel (relation xrel)
-        yrel (relation yrel)]
-    (and
-     (impl/counted? xrel)
-     (impl/counted? yrel)
-     (<= (impl/count xrel) (impl/count yrel)))))
-
-(defn- flip [f]
-  (fn [a b]
-    (f b a)))
+(defn- self-join* [as kmap kind]
+  (fn [rf]
+    (let [items (volatile! [])]
+      (fn
+        ([] (rf))
+        ([res]
+         (let [f (comp
+                  (map #(update-keys % (comp (partial keyword as) name)))
+                  (join* @items kmap kind))]
+           (rf (reduce (f rf) res @items))))
+        ([res item]
+         (vswap! items conj item)
+         res)))))
 
 (defn join
   "Joins relation yrel using the corresponding attributes in kmap.
 
   Keys in yrel will be merged into xrel with yrel taking precedence."
-  ([xrel yrel kmap]
-   (join xrel yrel kmap right-precedence :inner))
-  ([xrel yrel kmap precedence kind]
-   (cond
-     (and (qualified-keyword? yrel)
+  ([yrel kmap]
+   (join yrel kmap :inner))
+  ([yrel kmap kind]
+   (if (and (qualified-keyword? yrel)
           (= "self" (namespace yrel)))
-     (let [namespace (name yrel)]
-       (-> xrel
-           (comp (map #(update-keys % (core/comp (partial keyword namespace) name))))
-           (join xrel kmap precedence kind)))
-
-     (and (= :innner kind)
-          (flip? xrel yrel))
-     (comp yrel (join* xrel (set/map-invert kmap) (flip precedence) kind))
-
-     :else
-     (comp xrel (join* yrel kmap precedence kind)))))
+     (self-join* (name yrel) kmap kind)
+     (join* yrel kmap kind))))
 
 (defn left-join
   "Same as join but always keeps all rows in xrel"
-  [xrel yrel kmap]
-  (join xrel yrel kmap right-precedence :outer))
+  [yrel kmap]
+  (join yrel kmap :outer))
 
 (defn right-join
   "Same as join but always keep all rows in yrel"
-  [xrel yrel kmap]
-  (join yrel xrel (set/map-invert kmap) left-precedence :outer))
+  [yrel kmap]
+  (join yrel kmap :right))
 
-(defn full-join [xrel yrel kmap]
-  (join xrel yrel kmap right-precedence :full))
+(defn full-join [yrel kmap]
+  (join yrel kmap :full))
 
-(defn anti-join [xrel yrel kmap]
-  (-> xrel
-      (left-join yrel kmap)
-      (select (apply every-pred (map #(core/comp nil? %) (vals kmap))))))
+(defn anti-join [yrel kmap]
+  (comp
+   (left-join yrel kmap)
+   (select (apply every-pred (map #(comp nil? %) (vals kmap))))))
 
 (defn aggregate-by
   "Returns an aggregated relation grouped by ks using aggs-map.
   aggs-map should be a map from key to a vector of agg-fn, key-fn.
   agg-fn must be a reducing function.
 
-  Example: (aggregate-by rel [:album/name] {:album/length [+ :song/length]})"
-  ([rel ks aggs-map]
+  Example: (aggregate-by [:album/name] {:album/length [+ :song/length]})"
+  ([ks aggs-map]
    (let [ks (if (keyword ks) [ks] ks)]
-     (->>
-      (reduce
-       (fn [aggs row]
-         (let [by (select-keys row ks)]
-           (-> (reduce-kv
-                (fn [aggs k [agg-fn key-fn]]
-                  (let [new (agg-fn (get-in aggs [by k] (agg-fn)) (key-fn row))]
-                    (assoc! aggs by (assoc! (get aggs by (transient {})) k new))))
-                aggs
-                aggs-map))))
-       (transient {})
-       (seq (relation rel)))
-      (persistent!)
-      (map (fn [[by row]]
-             (merge-with (fn [[agg-fn _] res]
-                            (agg-fn res))
-                         aggs-map
-                         (merge (persistent! row) by))))
-      relation)))
-  ([rel ks key agg & more]
-   (aggregate-by rel ks (apply hash-map key agg more))))
+     (fn [rf]
+       (let [aggs (volatile! {})]
+         (fn
+           ([] (rf))
+           ([res]
+            (->> @aggs
+                 (map (fn [[by row]]
+                        (merge-with (fn [[agg-fn _] res]
+                                      (agg-fn res))
+                                    aggs-map
+                                    (merge row by))))
+                 (reduce rf res)
+                 rf))
+           ([res item]
+            (let [by (select-keys item ks)]
+              (vreset!
+               aggs
+               (reduce-kv (fn [aggs' k [agg-fn key-fn]]
+                            (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
+                              (core/assoc aggs'
+                                          by
+                                          (core/assoc (get aggs' by {})
+                                                      k
+                                                      new))))
+                          @aggs
+                           aggs-map)))
+            res))))))
+  ([ks key agg & more]
+   (aggregate-by ks (apply hash-map key agg more))))
 
 (defn aggregate-over
   "Returns a relation with aggregations joined into rel.
   See aggregate-by"
-  ([rel ks aggs-map]
-   (join rel
-         (aggregate-by rel ks aggs-map)
-         (into {} (map #(vector % %) (if (keyword? ks) [ks] ks)))))
-  ([rel ks key agg & more]
-   (aggregate-over rel ks (apply hash-map key agg more))))
+  ([ks aggs-map]
+   (let [ks (if (keyword ks) [ks] ks)]
+     (fn [rf]
+       (let [aggs (volatile! {})
+             idx (volatile! {})]
+         (fn
+           ([] (rf))
+           ([res]
+            (->> @aggs
+                 (map (fn [[by row]]
+                        (merge-with (fn [[agg-fn _] res]
+                                      (agg-fn res))
+                                    aggs-map
+                                    (merge row by))))
+                 (mapcat (fn [row]
+                           (->> (get @idx (select-keys row ks))
+                                (map #(merge % row)))))
+                 (reduce rf res)
+                 rf))
+           ([res item]
+            (let [by (select-keys item ks)]
+              (vswap! idx core/update by (fnil conj []) item)
+              (vreset!
+               aggs
+               (reduce-kv (fn [aggs' k [agg-fn key-fn]]
+                            (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
+                              (core/assoc aggs'
+                                          by
+                                          (core/assoc (get aggs' by {})
+                                                      k
+                                                      new))))
+                          @aggs
+                          aggs-map)))
+            res))))))
+  ([ks key agg & more]
+   (aggregate-over ks (apply hash-map key agg more))))
 
 (defn aggregate
   "Returns an aggregated relation.
@@ -295,78 +282,88 @@
   that produces an initial value.
 
   Example: (aggregate rel {:album/length [+ :song/length]})"
-  ([rel aggs-map]
-   (aggregate-by rel [] aggs-map))
-  ([rel key agg & more]
-   (aggregate-by rel [] (apply hash-map key agg more))))
+  ([aggs-map]
+   (aggregate-by [] aggs-map))
+  ([key agg & more]
+   (aggregate-by [] (apply hash-map key agg more))))
 
-(defn sort-by [rel keyfn]
-  (let [by (fn [x y]
-             (let [xval (keyfn x)
-                   yval (keyfn y)
-                   by-val (compare xval yval)]
-               (if (zero? by-val)
-                 (compare (hash x) (hash y))
-                 by-val)))]
-    (relation (into (sorted-set-by by) (impl/entries (relation rel))))))
+(defn sort-by [keyfn]
+  (fn [rf]
+    (let [items (volatile! (transient []))]
+      (fn
+        ([] (rf))
+        ([res]
+         (->> @items
+              persistent!
+              (core/sort-by keyfn)
+              (reduce rf res)
+              rf))
+        ([res item]
+         (vswap! items conj! item)
+         res)))))
 
-(defn normalize
+(defn- normalize
   "Normalizes a relation.
-  Returns a map of namespace to distinct maps with keys for only that namespace.
-
-  Realises rel."
-  [rel]
-  (->
-   (reduce (fn [{:keys [relmap ks kmap]} row]
-             (let [rel-keys (keys row)
-                   update-ks? (not-every? ks rel-keys)
-                   ks (if update-ks? (into ks (keys row)) ks)
-                   kmap (if update-ks?
-                          (core/group-by (core/comp keyword namespace) ks)
-                          kmap)]
-               {:kmap kmap
-                :ks ks
-                :relmap
-                (reduce-kv (fn [relmap relvar ks]
-                             (let [selected (select-keys row ks)]
-                               (if (core/seq selected)
-                                 (core/assoc! relmap
-                                              relvar
-                                              (conj! (get relmap relvar (transient #{}))
-                                                     selected))
-                                 relmap)))
-                           relmap
-                           kmap)}))
-           {:kmap {}
-            :ks #{}
-            :relmap (transient {})}
-           (impl/entries (relation rel)))
-   :relmap
-   (persistent!)
-   (update-vals persistent!)))
+  Returns a map of namespace to distinct maps with keys for only that namespace."
+  ([]
+   {:kmap {}
+    :ks #{}
+    :relmap (transient {})})
+  ([{:keys [relmap]}]
+   (-> relmap
+       persistent!
+       (update-vals persistent!)))
+  ([{:keys [relmap ks kmap]} row]
+   (let [rel-keys (keys row)
+         update-ks? (not-every? ks rel-keys)
+         ks (if update-ks? (into ks (keys row)) ks)
+         kmap (if update-ks?
+                (group-by (comp keyword namespace) ks)
+                kmap)]
+     {:kmap kmap
+      :ks ks
+      :relmap
+      (reduce-kv (fn [relmap relvar ks]
+                   (let [selected (select-keys row ks)]
+                     (if (seq selected)
+                       (core/assoc! relmap
+                                    relvar
+                                    (conj! (get relmap relvar (transient #{}))
+                                           selected))
+                       relmap)))
+                 relmap
+                 kmap)})))
 
 (defn union
   "Returns a relation that is the union of xrel and yrel."
-  [xrel yrel]
-  (let [xrel (relation xrel)
-        yrel (relation yrel)]
-    (relation (into (impl/set yrel) (impl/entries xrel)))))
+  [yrel]
+  (comp
+   (fn [rf]
+     (fn
+       ([] (rf))
+       ([res] (rf (reduce rf res yrel)))
+       ([res item] (rf res item))))
+   (distinct)))
+
+(defn union-all
+  [yrel]
+  (fn [rf]
+    (fn
+      ([] (rf))
+      ([res] (rf (reduce rf res yrel)))
+      ([res item] (rf res item)))))
 
 (defn difference
   "Returns a relation that is xrel without the elemens in yrel."
-  [xrel yrel]
-  (let [yset (impl/set (relation yrel))]
-    (if (empty? yset)
-      xrel
-      (comp xrel (remove (impl/set yrel))))))
+  [yrel]
+  (comp (remove (set yrel))
+        (distinct)))
 
 (defn intersection
   "Returns a relation that is the intersection of xrel and yrel."
-  [xrel yrel]
-  (let [yset (impl/set (relation yrel))]
-    (if (empty? yset)
-      (relation #{})
-      (comp xrel (filter yset)))))
+  [yrel]
+  (comp (filter (set yrel))
+        (distinct)))
 
 (defn stats-agg
   ([] {:max #?(:clj Double/NEGATIVE_INFINITY
@@ -384,49 +381,41 @@
              :count (inc cnt)
              :avg (/ (+ sum y) (inc cnt)))))
 
-(defn extend-stats [rel k]
+(defn extend-stats [k]
   (let [ns (namespace k)]
-    (comp
-     rel
-     (map #(merge
-            (core/dissoc % k)
-            (update-keys
-             (k %)
-             (fn [stat-k]
-               (keyword ns
-                        (if (= :count stat-k)
-                          (name stat-k)
-                          (str (name stat-k) "-" (name k)))))))))))
+    (map #(merge
+           (core/dissoc % k)
+           (update-keys
+            (k %)
+            (fn [stat-k]
+              (keyword ns
+                       (if (= :count stat-k)
+                         (name stat-k)
+                         (str (name stat-k) "-" (name k))))))))))
 
-(defn extend-kv [rel k]
+(defn extend-kv [k]
   (let [ns (namespace k)]
-    (comp
-     rel
-     (map #(merge
-            (core/dissoc % k)
-            (update-keys
-             (k %)
-             (fn [k']
-               (keyword ns (name k')))))))))
+    (map #(merge
+           (core/dissoc % k)
+           (update-keys
+            (k %)
+            (fn [k']
+              (keyword ns (name k'))))))))
 
-(defn expand-kv [rel k]
+(defn expand-kv [k]
   (let [ns (namespace k)]
-    (comp
-     rel
-     (mapcat (fn [row]
-               (map (fn [[key val]]
-                      (core/assoc (core/dissoc row k)
-                                  (keyword ns "key") key
-                                  (keyword ns "val") val))
-                    (k row)))))))
+    (mapcat (fn [row]
+              (map (fn [[key val]]
+                     (core/assoc (core/dissoc row k)
+                                 (keyword ns "key") key
+                                 (keyword ns "val") val))
+                   (k row))))))
 
-(defn expand-seq [rel k]
-  (comp
-   rel
-   (mapcat (fn [row]
-             (map (fn [val]
-                    (core/assoc row k val))
-                  (k row))))))
+(defn expand-seq [k]
+  (mapcat (fn [row]
+            (map (fn [val]
+                   (core/assoc row k val))
+                 (k row)))))
 
 (defn conj-agg [ctor]
   (fn
