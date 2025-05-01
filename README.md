@@ -14,9 +14,7 @@ There is no optimizer, so ensuring optimal performance is up to the caller.
 
 ## Uniqueness
 
-Similarly to SQL, Relation will not guarantee uniqueness, except
-`union`, `intersection`, `difference` and `|>set`. It is up to the caller to
-insert `(distinct)` operations where needed for uniqueness.
+Similarly to SQL, Relation will not guarantee uniqueness, except `union`, `intersection`, `difference` and `|>set`. It is up to the caller to insert `(distinct)` operations where needed for uniqueness.
 
 ## Usage
 
@@ -112,15 +110,13 @@ And they compose easily like this:
 
 ### Aggregations
 
-As seen in the example we can aggregate relations. Relation
-comes with a few built in aggregation functions:
+As seen in the example we can aggregate relations. Relation comes with a few built in aggregation functions:
 
 * set-agg - Aggregates values into a set
 * vec-agg - Aggregates values into a vector
 * stats-agg - Aggregates simple stats like min, max, count, avg and sum
 
-All aggregations are transducing functions which means that we can easily
-use any of the statistics from [MastodonC/kixi.stats](https://github.com/MastodonC/kixi.stats)
+All aggregations are transducing functions which means that we can easily use any of the statistics from [MastodonC/kixi.stats](https://github.com/MastodonC/kixi.stats)
 
 ``` clojure
 (require '[kixi.stats.core :as stats])
@@ -133,8 +129,7 @@ use any of the statistics from [MastodonC/kixi.stats](https://github.com/Mastodo
 
 ### Extending
 
-The `|>` macros compose a transducing process so each step can be exteded using
-any transducer.
+The `|>`, `|>set`, `|>vec`, `|>normalized` macros compose a transducing process so each step can be exteded using any transducer.
 
 ``` clojure
 
