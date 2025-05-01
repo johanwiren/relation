@@ -150,16 +150,17 @@
 
 (defn- self-join* [as kmap kind]
   (fn [rf]
-    (let [items (volatile! [])]
+    (let [items (volatile! (transient []))]
       (fn
         ([] (rf))
         ([res]
-         (let [f (comp
+         (let [items (persistent! @items)
+               f (comp
                   (map #(update-keys % (comp (partial keyword as) name)))
-                  (join* @items kmap kind))]
-           (rf (reduce (f rf) res @items))))
+                  (join* items kmap kind))]
+           (rf (reduce (f rf) res items))))
         ([res item]
-         (vswap! items conj item)
+         (vswap! items conj! item)
          res)))))
 
 (defn join
