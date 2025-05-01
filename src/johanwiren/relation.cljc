@@ -22,6 +22,17 @@
   [relation & xforms]
   `(into [] (comp ~@xforms) ~relation))
 
+(defn- --first
+  ([] nil)
+  ([x] x)
+  ([_ x] (reduced x)))
+
+(defmacro |>first
+  [relation & xforms]
+  `(transduce (comp ~@xforms)
+              #'--first
+              ~relation))
+
 (defmacro |>normalized
   [relation & forms]
   `(transduce (comp ~@forms) #'normalize ~relation))

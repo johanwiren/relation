@@ -1,6 +1,6 @@
 (ns johanwiren.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.relation :as r :refer [|>set |>seq |>vec |>]])
+            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first]])
   #?(:cljs (:require-macros johanwiren.relation)))
 
 (def genre #{{:genre/id 0
@@ -124,7 +124,10 @@
   (is (seq? (|> (seq [:a]))))
   (is (set? (|>set [:a])))
   (is (vector? (|>vec #{:a})))
-  (is (seq? (|>seq [:a]))))
+  (is (seq? (|>seq [:a])))
+  (is (nil? (|>first [])))
+  (is (= 1 (|>first (range)
+                    (r/select odd?)))))
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"
