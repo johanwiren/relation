@@ -562,25 +562,17 @@
     (r/aggregate-by :song/album-name {:album/length [+ :song/length]
                                       :album/artists [r/set-agg :artist/name]}))
 
-  (|> #{{:a 1} {:a 2}}
-    (r/assoc :mohah/key 32 :hih/a 1)
-    #_(r/dissoc :hih/a))
-
-
-
   ;; Integrates wonderfully with kixi stats
   (|> song
     (r/aggregate-by :song/album-name {:album/song-length [r/stats-agg :song/length]
                                       :album/song-lengths [r/vec-agg :song/length]
-                                      :album/variance-length [stats/variance-p :song/length]
-                                      :test/max [+ :song/length]})
-    #_(r/extend-kv :album/song-length)
-    #_(r/expand-seq :album/song-lengths))
+                                      :album/variance-length [stats/variance-p :song/length]})
+    (r/extend-kv :album/song-length)
+    (r/expand-seq :album/song-lengths))
   
-
   (|> song
-    (r/comp (map :song/length)
-            (map inc)))
+    (map :song/length)
+    (map inc))
 
   (|> #{{:tree-node 3 :some-key :val}
         {:tree-node 2 :some-other-key :val}}
@@ -589,10 +581,6 @@
                         {:node 3 :parent 2}}
                       {:tree-node :node}
                       {:parent :node}))
-
-  #{:apa}
-
-  (compare (hash 42) (hash ""))
 
   nil)
 
