@@ -1,6 +1,6 @@
 (ns johanwiren.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first]])
+            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]])
   #?(:cljs (:require-macros johanwiren.relation)))
 
 (def genre #{{:genre/id 0
@@ -118,7 +118,7 @@
                    :genre "New wave of British heavy metal"
                    :length 428}})
 
-(deftest macros-test
+(deftest |>fns-test
   (is (set? (|> #{:a})))
   (is (vector? (|> [:a])))
   (is (seq? (|> (seq [:a]))))
@@ -127,7 +127,11 @@
   (is (seq? (|>seq [:a])))
   (is (nil? (|>first [])))
   (is (= 1 (|>first (range)
-                    (r/select odd?)))))
+                    (r/select odd?))))
+  (is (nil? (|>last [])))
+  (is (= 9 (|>last (range)
+                   (take 10)
+                   (r/select odd?)))))
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"

@@ -31,6 +31,17 @@
   [relation & xforms]
   (transduce (reduce comp xforms) --first relation))
 
+(defn- --last []
+  (let [prev (volatile! nil)]
+    (fn
+      ([] nil)
+      ([x] @prev)
+      ([res x] (vreset! prev x) res))))
+
+(defn |>last
+  [relation & xforms]
+  (transduce (reduce comp xforms) (--last) relation))
+
 (declare normalize)
 
 (defn |>normalized
