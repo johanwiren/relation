@@ -21,6 +21,7 @@ The `|>` function is the preferred method to interact with this library, it give
 
 Since it is a function it can be used anywhere a function is needed:
 
+```clojure
 (->
  {:person [{:person/name "Alice" :person/yob 1972}
            {:person/name "Bob" :person/yob 1967}]}
@@ -28,6 +29,7 @@ Since it is a function it can be used anywhere a function is needed:
          |>
          (r/select (comp (partial < 1970) :person/yob))
          (r/project [:person/name])))
+```
 
 ### Why a new way "pipe" to pipe things? Why not just `->` or `->>`?
 
@@ -35,7 +37,7 @@ First of all they are not functions and cannot be used where a function is neede
 
 ### I still want to do more processing after the `|>` terminates, like extracting a single value, how do I do that?
 
-Most things should be expressable together with transducers in clojure.core and you can also use `|>first` in combination like this:
+Most things should be expressable together with transducers in *clojure.core* and you can also use `|>first` in combination like this:
 
 ```clojure
 (|>first
