@@ -118,6 +118,17 @@
                    :genre "New wave of British heavy metal"
                    :length 428}})
 
+(def apple-sales
+  #{{:category "iphone" :model "iPhone Eclipse" :price 899}
+    {:category "iphone" :model "iPhone Eclipse" :price 999}
+    {:category "iphone" :model "iPhone Pulse" :price 999}
+    {:category "iphone" :model "iPhone Pulse" :price 1099}
+    {:category "mac" :model "Mac Mini Turbo" :price 799}
+    {:category "mac" :model "Mac Mini Turbo" :price 899}
+    {:category "mac" :model "MacBook Airflow" :price 1299}
+    {:category "mac" :model "MacBook Airflow" :price 1999}
+    {:category "mac" :model "MacBook Airflow" :price 1499}})
+
 (deftest |>fns-test
   (is (set? (|> #{:a})))
   (is (vector? (|> [:a])))
@@ -287,6 +298,14 @@
                   (r/sort-by :artist/name)
                   (r/project [:artist/name]))))))
 
+(defn avg
+  ([] {:count 0 :sum 0})
+  ([{:keys [count sum]}] (if (pos? count)
+                           (/ sum count)
+                           0))
+  ([state val]
+   (merge-with + state {:count 1 :sum val})))
+
 (deftest aggregate-by-test
   (testing "It aggregates"
     (is (= #{{:album/length 2351,
@@ -294,7 +313,48 @@
              {:album/length 2259,
               :song/album-name "Iron Maiden"}}
            (|> song
-             (r/aggregate-by :song/album-name {:album/length [+ :song/length]}))))))
+             (r/aggregate-by {:song/album-name {:album/length [+ :song/length]}})))))
+  (testing "It aggregates on multiple levels"
+    (is (= [{:global/avg-price #?(:clj 3497/3 :cljs 1165.6666666666667)}
+            {:category/avg-price 999 :category "iphone"}
+            {:model/avg-price 949 :category "iphone" :model "iPhone Eclipse"}
+            {:model/avg-price 1049 :category "iphone" :model "iPhone Pulse"}
+            {:category/avg-price 1299 :category "mac"}
+            {:model/avg-price 849 :category "mac" :model "Mac Mini Turbo"}
+            {:model/avg-price 1599 :category "mac" :model "MacBook Airflow"}]
+           (|>vec
+            apple-sales
+            (r/aggregate-by {[] {:global/avg-price [avg :price]}
+                             :category {:category/avg-price [avg :price]}
+                             [:category :model] {:model/avg-price [avg :price]}})
+            (r/sort-by (juxt :category :model))))))
+  (testing "Joining aggs"
+    (is (= #{{:category "iphone"
+              :model "iPhone Eclipse"
+              :price 999
+              :category/avg-price 999
+              :model/avg-price 949
+              :global/avg-price #?(:clj 3497/3 :cljs 1165.6666666666667)}
+             {:category "iphone"
+              :model "iPhone Eclipse"
+              :price 899
+              :category/avg-price 999
+              :model/avg-price 949
+              :global/avg-price #?(:clj 3497/3 :cljs 1165.6666666666667)}}
+           (let [aggs
+                 (|>
+                  apple-sales
+                  (r/aggregate-by {[] {:global/avg-price [avg :price]}
+                                   :category {:category/avg-price [avg :price]}
+                                   [:category :model] {:model/avg-price [avg :price]}}))]
+             (|> apple-sales
+                 (r/join (|> aggs (r/select (comp nil? :model)))
+                         {:category :category})
+                 (r/join (|> aggs (r/select :model))
+                         {:category :category, :model :model})
+                 (r/join (|> aggs (r/select (complement (some-fn :model :category))))
+                         {})
+                 (r/select (comp #{"iPhone Eclipse"} :model))))))))
 
 (deftest stats-test
   (testing "It builds stats"

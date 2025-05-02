@@ -216,46 +216,73 @@
    (select (apply every-pred (map #(comp nil? %) (vals kmap))))))
 
 (defn aggregate-by
-  "Returns an aggregated relation grouped by ks using aggs-map.
-  aggs-map should be a map from key to a vector of agg-fn, key-fn.
-  agg-fn must be a reducing function.
+  "Returns an aggregated relation.
 
-  Example: (aggregate-by [:album/name] {:album/length [+ :song/length]})"
-  ([ks aggs-map]
-   (let [ks (if (keyword ks) [ks] ks)]
-     (fn [rf]
-       (let [aggs (volatile! {})]
-         (fn
-           ([] (rf))
-           ([res]
-            (->> @aggs
-                 (map (fn [[by row]]
-                        (merge-with (fn [[agg-fn _] res]
-                                      (agg-fn res))
-                                    aggs-map
-                                    (merge row by))))
-                 (reduce rf res)
-                 rf))
-           ([res item]
-            (let [by (select-keys item ks)]
-              (vreset!
-               aggs
-               (reduce-kv (fn [aggs' k [agg-fn key-fn]]
-                            (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
-                              (core/assoc aggs'
-                                          by
-                                          (core/assoc (get aggs' by {})
-                                                      k
-                                                      new))))
-                          @aggs
+  Aggregates on multiple aggregation levels in one single pass.
+
+  Takes a map of grouping keys to aggregation map.
+  The grouping keys can be either a bare key or a vector of keys
+
+  The aggregation map should be a map from key to a vector of agg-fn, key-fn.
+  agg-fn must be a reducing function with identity.
+
+  Example:
+  (aggregate-by {:country {:country/avg [avg :pollution]}
+                 [:country :county] {:county/avg [avg :pollution]}})
+  => #{{:country/avg 42 :country :UK}
+       {:county/avg 97 :country :UK :county :London}
+       {:count/avg 19 :country :UK :county :SouthWest}}
+
+  Shorthande with only one grouping:
+  (aggregate-by :country {:avg [avg :pollution]})
+
+  or
+
+  (aggregate-by [:country :county] {:avg [avg :pollution]})"
+
+  ([agg-by-map]
+   (fn [rf]
+     (let [aggs (volatile! {})]
+       (fn
+         ([] (rf))
+         ([res]
+          (->> @aggs
+               (map (fn [[by row]]
+                      (merge-with (fn [[agg-fn _] res]
+                                    ;; Invoke the completing function
+                                    (agg-fn res))
+                                  (get agg-by-map (::by row))
+                                  (merge row by))))
+               (map (fn [row] (core/dissoc row ::by)))
+               (reduce rf res)
+               rf))
+         ([res item]
+          (vreset!
+           aggs
+           (reduce-kv
+            (fn [aggs ks aggs-map]
+              (let [by (select-keys item (if (keyword? ks) [ks] ks))]
+                (reduce-kv (fn [aggs' k [agg-fn key-fn]]
+                             (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
+                               (core/assoc aggs'
+                                           by
+                                           (core/assoc (get aggs' by {::by ks})
+                                                       k
+                                                       new))))
+                           aggs
                            aggs-map)))
-            res))))))
+            @aggs
+            agg-by-map))
+          res)))))
+  ([ks agg]
+   (aggregate-by {ks agg}))
   ([ks key agg & more]
-   (aggregate-by ks (apply hash-map key agg more))))
+   (aggregate-by {ks (apply hash-map key agg more)})))
 
 (defn aggregate-over
   "Returns a relation with aggregations joined into rel.
-  See aggregate-by"
+
+  See aggregate-by. Supports only one grouping."
   ([ks aggs-map]
    (let [ks (if (keyword ks) [ks] ks)]
      (fn [rf]
