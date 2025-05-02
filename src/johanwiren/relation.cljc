@@ -282,43 +282,59 @@
 (defn aggregate-over
   "Returns a relation with aggregations joined into rel.
 
-  See aggregate-by. Supports only one grouping."
-  ([ks aggs-map]
-   (let [ks (if (keyword ks) [ks] ks)]
-     (fn [rf]
-       (let [aggs (volatile! {})
-             idx (volatile! {})]
-         (fn
-           ([] (rf))
-           ([res]
-            (->> @aggs
-                 (map (fn [[by row]]
-                        (merge-with (fn [[agg-fn _] res]
-                                      (agg-fn res))
-                                    aggs-map
-                                    (merge row by))))
-                 (mapcat (fn [row]
-                           (->> (get @idx (select-keys row ks))
-                                (map #(merge % row)))))
-                 (reduce rf res)
-                 rf))
-           ([res item]
-            (let [by (select-keys item ks)]
-              (vswap! idx core/update by (fnil conj []) item)
-              (vreset!
-               aggs
-               (reduce-kv (fn [aggs' k [agg-fn key-fn]]
-                            (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
-                              (core/assoc aggs'
-                                          by
-                                          (core/assoc (get aggs' by {})
-                                                      k
-                                                      new))))
-                          @aggs
-                          aggs-map)))
-            res))))))
+  See aggregate-by."
+  ([agg-by-map]
+   (fn [rf]
+     (let [aggs (volatile! {})
+           items (volatile! (transient []))
+           expanded-ks (map (fn [ks] (if (keyword? ks) [ks] ks)) (keys agg-by-map))]
+       (fn
+         ([] (rf))
+         ([res]
+          (let [completed-aggs
+                (into {}
+                      (map (fn [[by row]]
+                             [by (merge-with (fn [[agg-fn _] res]
+                                              ;; Invoke the completing function
+                                              (agg-fn res))
+                                            (get agg-by-map (::by row))
+                                            (merge (core/dissoc row ::by) by))]))
+                      @aggs)]
+            (->> @items
+                 persistent!
+                 (reduce
+                  (fn [res row]
+                    (->> (reduce
+                          (fn [row by]
+                            (merge row (get completed-aggs (select-keys row by))))
+                          row
+                          expanded-ks)
+                         (rf res)))
+                  res)
+                 rf)))
+         ([res item]
+          (vswap! items conj! item)
+          (vreset!
+           aggs
+           (reduce-kv
+            (fn [aggs ks aggs-map]
+              (let [by (select-keys item (if (keyword? ks) [ks] ks))]
+                (reduce-kv (fn [aggs' k [agg-fn key-fn]]
+                             (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
+                               (core/assoc aggs'
+                                           by
+                                           (core/assoc (get aggs' by {::by ks})
+                                                       k
+                                                       new))))
+                           aggs
+                           aggs-map)))
+            @aggs
+            agg-by-map))
+          res)))))
+  ([ks agg]
+   (aggregate-over {ks agg}))
   ([ks key agg & more]
-   (aggregate-over ks (apply hash-map key agg more))))
+   (aggregate-by {ks (apply hash-map key agg more)})))
 
 (defn aggregate
   "Returns an aggregated relation.
