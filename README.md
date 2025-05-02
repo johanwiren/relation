@@ -63,11 +63,11 @@ Similarly to SQL, Relation will not guarantee uniqueness, except `union`, `inter
 ``` clojure
 (require '[johanwiren.relation :as r :refer [|> |>first]])
 
-(def employee #{{:name "Harry" :emp-id 3415 :dept-name "Finance"}
-                {:name "Sally" :emp-id 2241 :dept-name "Sales"}
-                {:name "George" :emp-id 3401 :dept-name "Finance"}
-                {:name "Harriet" :emp-id 2202 :dept-name "Sales"}
-                {:name "Mary" :emp-id 1257 :dept-name "Human Resources"}})
+(def employee #{{:name "Harry" :emp-id 3415 :dept-name "Finance" :age 57}
+                {:name "Sally" :emp-id 2241 :dept-name "Sales" :age 26}
+                {:name "George" :emp-id 3401 :dept-name "Finance" :age 42}
+                {:name "Harriet" :emp-id 2202 :dept-name "Sales" :age 54}
+                {:name "Mary" :emp-id 1257 :dept-name "Human Resources" :age 35}})
                 
 (def dept #{{:name "Finance" :manager "George"}
             {:name "Sales" :manager "Harriet"}
@@ -118,75 +118,30 @@ Relation provides a rich set of operations
 * expand-kv
 * expand-seq
 
-And they compose easily like this:
-
-``` clojure
-(|> employee
-    (r/join dept {:dept-name :name})
-    (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
-    (r/update :dept-colleagues count)
-    (r/sort-by :emp-id))
-
-=> #{{:name "Finance",
-      :emp-id 3415,
-      :dept-name "Finance",
-      :manager "George",
-      :dept-colleagues 2}
-     {:name "Sales",
-      :emp-id 2202,
-      :dept-name "Sales",
-      :manager "Harriet",
-      :dept-colleagues 2}
-     {:name "Finance",
-      :emp-id 3401,
-      :dept-name "Finance",
-      :manager "George",
-      :dept-colleagues 2}
-     {:name "Sales",
-      :emp-id 2241,
-      :dept-name "Sales",
-      :manager "Harriet",
-      :dept-colleagues 2}}
-
-```
-
-They're just transducers though so they fit into any transducing process. There is no need to use the |>* macros.
-
-The snippet above expands to:
-
-```clojure
-(into (empty employee) ;; Maintains the return type
-      (comp (r/join dept {:dept-name :name})
-            (r/aggregate-over :dept-name {:dept-colleagues [r/vec-agg :name]})
-            (r/update :dept-colleagues count)
-            (r/sort-by :emp-id))
-      employee)
-
-```
-
-
 ### Aggregations
 
-As seen in the example we can aggregate relations. Relation comes with a few built in aggregation functions:
+Relation has a few built in aggregation functions:
 
 * set-agg - Aggregates values into a set
 * vec-agg - Aggregates values into a vector
 * stats-agg - Aggregates simple stats like min, max, count, avg and sum
 
-All aggregations are transducing functions which means that we can easily use any of the statistics from [MastodonC/kixi.stats](https://github.com/MastodonC/kixi.stats)
+The aggregations all expect transducing functions which means that we you can easily write your own or use any of the statistics from [MastodonC/kixi.stats](https://github.com/MastodonC/kixi.stats)
 
 ``` clojure
 (require '[kixi.stats.core :as stats])
 
-(|> employee
-    (r/aggregate {:emp-id-stddev [stats/standard-deviation :emp-id]}))
+(|>first employee
+    (r/aggregate {:stddev-age [stats/standard-deviation :age]
+                  ;; Plain old clojure.core/+
+                  :total-age [+ :age]}))
 
-=> ({:emp-id-stddev 915.1378038306581})
+=> {:stddev-age 12.949903474543738, :total-age 214}
 ```
 
 ### Extending
 
-The `|>`, `|>seq`, `|>set`, `|>vec`, `|>normalized` macros compose a transducing process so each step can be exteded using any transducer.
+The `|>`, `|>seq`, `|>set`, `|>vec`, `|>normalized` functions compose a transducing process so each step can be exteded using any transducer.
 
 ``` clojure
 
