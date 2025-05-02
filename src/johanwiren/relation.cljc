@@ -293,20 +293,20 @@
          ([res]
           (let [completed-aggs
                 (into {}
-                      (map (fn [[by row]]
-                             [by (merge-with (fn [[agg-fn _] res]
+                      (map (fn [[ks row]]
+                             [ks (merge-with (fn [[agg-fn _] res]
                                               ;; Invoke the completing function
                                               (agg-fn res))
                                             (get agg-by-map (::by row))
-                                            (merge (core/dissoc row ::by) by))]))
+                                            (core/dissoc row ::by))]))
                       @aggs)]
             (->> @items
                  persistent!
                  (reduce
                   (fn [res row]
                     (->> (reduce
-                          (fn [row by]
-                            (merge row (get completed-aggs (select-keys row by))))
+                          (fn [row ks]
+                            (merge row (get completed-aggs (select-keys row ks))))
                           row
                           expanded-ks)
                          (rf res)))
