@@ -578,6 +578,32 @@
              (r/select* :song/longer-than-avg?)
              (r/project* [:song/name]))))))
 
+(deftest update-test
+  (testing "It updates values"
+    (is (= #{#:song{:name "Iron Maiden", :length 43}
+             #:song{:name "Prowler", :length 56}
+             #:song{:name "The Prisoner", :length 34}
+             #:song{:name "Strange World", :length 43}
+             #:song{:name "Gangland", :length 46}
+             #:song{:name "Running Free", :length 22}
+             #:song{:name "Hallowed Be Thy Name", :length 8}
+             #:song{:name "Run to the Hills", :length 50}
+             #:song{:name "Charlotte the Harlot", :length 14}
+             #:song{:name "22 Acacia Avenue", :length 34}
+             #:song{:name "The Number of the Beast", :length 25}
+             #:song{:name "Transylvania", :length 9}
+             #:song{:name "Remember Tomorrow", :length 30}
+             #:song{:name "Invaders", :length 20}
+             #:song{:name "Phantom Of the Opera", :length 2}
+             #:song{:name "Children of the Damned", :length 34}}
+           (|> song
+               (r/update :song/length mod 60)
+               (r/project [:song/name :song/length]))
+           (-> song
+               (r/update* :song/length mod 60)
+               (r/project* [:song/name :song/length]))))))
+
+
 (deftest normalize-test
   (testing "It normalizes"
     (is (= {:song song
