@@ -10,7 +10,7 @@ Experimental, use at your own risk. Things will probably change.
 
 ## The |> function
 
-The `|>` function is the preferred method to interact with this library, it gives a nice way to relational algebra expressions in linear fashion like this:
+The `|>` function is the preferred method to interact with this library, it gives a nice way to write relational algebra expressions in linear fashion like this:
 
 ```clojure
 (|> relation-a
