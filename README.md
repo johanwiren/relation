@@ -8,6 +8,46 @@ Builds entirely on transducers and can be extended as such.
 
 Experimental, use at your own risk. Things will probably change.
 
+## The |> function
+
+The `|>` function is the preferred method to interact with this library, it gives a nice way to relational algebra expressions in linear fashion like this:
+
+```clojure
+(|> relation-a
+    (r/select (comp pos? :a/val))
+    (r/join relation-b {:a/b-id :b/id})
+    (r/aggregate :a/sum [+ :a/val]))
+```
+
+Since it is a function it can be used anywhere a function is needed:
+
+(->
+ {:person [{:person/name "Alice" :person/yob 1972}
+           {:person/name "Bob" :person/yob 1967}]}
+ (update :person
+         |>
+         (r/select (comp (partial < 1970) :person/yob))
+         (r/project [:person/name])))
+
+### Why a new way "pipe" to pipe things? Why not just `->` or `->>`?
+
+First of all they are not functions and cannot be used where a function is needed. Second, the `|>` is now used in many places to express pipes of relational algebra expressions.
+
+### I still want to do more processing after the `|>` terminates, like extracting a single value, how do I do that?
+
+Most things should be expressable together with transducers in clojure.core and you can also use `|>first` in combination like this:
+
+```clojure
+(|>first
+ [{:age 42} {:age 19}]
+ (r/select (comp (partial < 20) :age))
+ ;; Note that we can add normal transducers from clojure.core
+ (map :age))
+
+=> 42
+
+```
+
 ## Performance
 
 There is no optimizer, so ensuring optimal performance is up to the caller.
@@ -19,7 +59,7 @@ Similarly to SQL, Relation will not guarantee uniqueness, except `union`, `inter
 ## Usage
 
 ``` clojure
-(require '[johanwiren.relation :as r :refer [|>]])
+(require '[johanwiren.relation :as r :refer [|> |>first]])
 
 (def employee #{{:name "Harry" :emp-id 3415 :dept-name "Finance"}
                 {:name "Sally" :emp-id 2241 :dept-name "Sales"}

@@ -595,7 +595,21 @@
            (|> song
              (r/sort-by :song/length)
              (map :song/length)
-             (take 1))))))
+             (take 1)))))
+  (testing "It is a normal function, useable in regular update etc"
+    (is (= {:artist #{#:artist{:name "Meg White"}
+                      #:artist{:name "Jack White"}},
+            :song #:song{:name "Gangland"}}
+           (-> (r/|>normalized song
+                               (r/join artist {}))
+               (update :song
+                       |>first
+                       (r/project [:song/name]))
+               (update :artist
+                       |>
+                       (r/select
+                           (comp #{"The White Stripes"} :artist/band-name))
+                       (r/project [:artist/name])))))))
 
 (comment
   (require '[kixi.stats.core :as stats]
