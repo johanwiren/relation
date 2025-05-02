@@ -403,7 +403,18 @@
              {:song/name "The Number of the Beast", :album/length 2351}}
            (|> song
              (r/aggregate-over :song/album-name {:album/length [+ :song/length]})
-             (r/project [:song/name :album/length]))))))
+             (r/project [:song/name :album/length])))))
+  (testing "It aggregates on multiple levels"
+    (is (= #{{:global/avg-price #?(:clj 3497/3 :cljs 1165.6666666666667)
+              :category/avg-price 999
+              :model/avg-price 949}}
+           (|>
+            apple-sales
+            (r/aggregate-over {[] {:global/avg-price [avg :price]}
+                               :category {:category/avg-price [avg :price]}
+                               [:category :model] {:model/avg-price [avg :price]}})
+            (r/select (comp #{"iPhone Eclipse"} :model))
+            (r/project-ns [:global :model :category]))))))
 
 (deftest aggs-test
   (testing "count-agg"
