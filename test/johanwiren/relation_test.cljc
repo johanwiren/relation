@@ -627,18 +627,17 @@
              (map :song/length)
              (take 1)))))
   (testing "It is a normal function, useable in regular update etc"
-    (is (= {:artist #{#:artist{:name "Meg White"}
-                      #:artist{:name "Jack White"}},
-            :song #:song{:name "Gangland"}}
+    (is (= {:artist #{#:artist{:name "Jack White"} #:artist{:name "Meg White"}}
+            :song #:song{:name "22 Acacia Avenue"}}
            (-> (r/|>normalized song
                                (r/join artist {}))
                (update :song
                        |>first
+                       (r/sort-by :song/name)
                        (r/project [:song/name]))
                (update :artist
                        |>
-                       (r/select
-                           (comp #{"The White Stripes"} :artist/band-name))
+                       (r/select (comp #{"The White Stripes"} :artist/band-name))
                        (r/project [:artist/name])))))))
 
 (comment
@@ -699,15 +698,25 @@
            (s/project [:artist/band-name])
            (->> (sort-by :artist/band-name)))
        nil))
-
-    (print "relation ")
+    (print "relation|> ")
     (time
      (dotimes [_ n]
-       (|> song
+       (|>vec song
          (r/join artist {:song/band-name :artist/band-name})
          (r/join song {:artist/band-name :song/band-name})
          (r/project [:artist/band-name])
          (r/sort-by :artist/band-name))
+       nil))
+    (print "relation-> ")
+    (time
+     (dotimes [_ n]
+       (-> song
+           vec
+           (r/join* artist {:song/band-name :artist/band-name})
+           (r/join* song {:artist/band-name :song/band-name})
+           (r/project* [:artist/band-name])
+           (r/sort-by* :artist/band-name)
+           vec)
        nil)))
 
   (require '[criterium.core :as c])
