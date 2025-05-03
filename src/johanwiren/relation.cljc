@@ -221,20 +221,21 @@
   Aggregates on multiple aggregation levels in one single pass.
 
   Takes a map of grouping keys to aggregation map.
-  The grouping keys can be either a bare key or a vector of keys
+  The grouping keys can be either a bare key or a vector of keys.
+  An empty vector creates a grouping for all entries.
 
   The aggregation map should be a map from key to a vector of agg-fn, key-fn.
   agg-fn must be a reducing function with identity.
 
   Example:
-  (aggregate-by {:country {:country/avg [avg :pollution]}
-                 [:country :county] {:county/avg [avg :pollution]}})
-  => #{{:country/avg 42 :country :UK}
-       {:county/avg 97 :country :UK :county :London}
-       {:count/avg 19 :country :UK :county :SouthWest}}
+  (aggregate-by {:country {:country/total [+ :pollution]}
+                 [:country :county] {:county/total [+ :pollution]}})
+  => #{{:country/total 142 :country :UK}
+       {:county/total 97 :country :UK :county :London}
+       {:count/total 45 :country :UK :county :SouthWest}}
 
-  Shorthande with only one grouping:
-  (aggregate-by :country {:avg [avg :pollution]})
+  Shorthand with only one grouping:
+  (aggregate-by :country {:country/total [+ :pollution]})
 
   or
 
