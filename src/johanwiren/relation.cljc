@@ -390,33 +390,29 @@
   "Normalizes a relation.
   Returns a map of namespace to distinct maps with keys for only that namespace."
   ([]
-   {:kmap {}
-    :ks #{}
-    :relmap (transient {})})
-  ([{:keys [relmap]}]
+   (transient {}))
+  ([relmap]
    (-> relmap
        persistent!
        (update-vals persistent!)))
-  ([{:keys [relmap ks kmap]} row]
-   (let [rel-keys (keys row)
-         update-ks? (not-every? ks rel-keys)
-         ks (if update-ks? (into ks (keys row)) ks)
-         kmap (if update-ks?
-                (group-by (comp keyword namespace) ks)
-                kmap)]
-     {:kmap kmap
-      :ks ks
-      :relmap
-      (reduce-kv (fn [relmap relvar ks]
-                   (let [selected (select-keys row ks)]
-                     (if (seq selected)
-                       (core/assoc! relmap
-                                    relvar
-                                    (conj! (get relmap relvar (transient #{}))
-                                           selected))
-                       relmap)))
-                 relmap
-                 kmap)})))
+  ([relmap row]
+   (let [by-ns
+         (-> (reduce-kv
+              (fn [m k v]
+                (let [nspace (keyword (namespace k))]
+                  (assoc! m nspace
+                   (assoc! (get m nspace (transient {})) k v))))
+              (transient {})
+              row)
+             (persistent!)
+             (update-vals persistent!))]
+     (reduce-kv
+      (fn [relmap ns row]
+        (assoc! relmap
+                ns
+                (conj! (get relmap ns (transient #{})) row)))
+      relmap
+      by-ns))))
 
 (defn union
   "Distinct union with rel."
