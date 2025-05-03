@@ -354,7 +354,7 @@
   ([ks agg]
    (aggregate-over {ks agg}))
   ([ks key agg & more]
-   (aggregate-by {ks (apply hash-map key agg more)})))
+   (aggregate-over {ks (apply hash-map key agg more)})))
 
 (defn aggregate
   "Aggregates a relation.
@@ -443,7 +443,7 @@
         (distinct)))
 
 (defn intersection
-  "Distinct rows that has are also in rel."
+  "Distinct rows that are also in rel."
   [rel]
   (comp (filter (set rel))
         (distinct)))
