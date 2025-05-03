@@ -91,12 +91,12 @@
   (map #(into {} (filter (comp pred key)) %)))
 
 (defn project-ns
-  "Keeps only keys with matching namespace(s)"
+  "Keep only keys with matching namespace(s) for each row."
   [namespaces]
   (project-pred (comp (into #{} (map name) namespaces) namespace)))
 
 (defn project
-  "Keeps only keys ks for each row"
+  "Keeps only keys ks for each row."
   [ks]
   (map #(select-keys % ks)))
 
@@ -112,9 +112,9 @@
    persistent!
    (update-vals persistent!)))
 
-(defn- -join [yrel kmap kind]
+(defn- -join [rel kmap kind]
   (fn [rf]
-    (let [idx (index yrel (vals kmap))
+    (let [idx (index rel (vals kmap))
           used-idx-keys (when (#{:full :right} kind)
                           (volatile! #{}))
           ks (keys kmap)]
@@ -140,16 +140,16 @@
                res))))))))
 
 (defn recursive-join
-  "Joins relation yrel using the corresponding attributes in join-kmap
-  For each found entry in yrel, recursively joins yrel on corresponding
+  "Joins with relation rel using the corresponding attributes in join-kmap
+  For each found entry in rel, recursively joins rel on corresponding
   attributes in recur-kmap.
 
   Adds :johanwiren.relation/depth to joined entries."
-  [yrel join-kmap recur-kmap]
+  [rel join-kmap recur-kmap]
   (fn [rf]
-    (let [join-idx (index yrel (vals join-kmap))
+    (let [join-idx (index rel (vals join-kmap))
           join-ks (keys join-kmap)
-          rec-idx (index yrel (vals recur-kmap))
+          rec-idx (index rel (vals recur-kmap))
           rec-ks (keys recur-kmap)]
       (fn
         ([] (rf))
@@ -186,37 +186,37 @@
          res)))))
 
 (defn join
-  "Joins relation yrel using the corresponding attributes in kmap.
+  "Joins with relation rel using the corresponding attributes in kmap.
 
-  Keys in yrel will be merged into xrel with yrel taking precedence."
-  ([yrel kmap]
-   (join yrel kmap :inner))
-  ([yrel kmap kind]
-   (if (and (qualified-keyword? yrel)
-          (= "self" (namespace yrel)))
-     (self-join (name yrel) kmap kind)
-     (-join yrel kmap kind))))
+  Keys in rel will be merged into the matched row with rel taking precedence."
+  ([rel kmap]
+   (join rel kmap :inner))
+  ([rel kmap kind]
+   (if (and (qualified-keyword? rel)
+          (= "self" (namespace rel)))
+     (self-join (name rel) kmap kind)
+     (-join rel kmap kind))))
 
 (defn left-join
-  "Same as join but always keeps all rows in xrel"
-  [yrel kmap]
-  (join yrel kmap :outer))
+  "Same as join but always keeps all unmatched rows."
+  [rel kmap]
+  (join rel kmap :outer))
 
 (defn right-join
-  "Same as join but always keep all rows in yrel"
-  [yrel kmap]
-  (join yrel kmap :right))
+  "Same as join but always keep all rows in rel"
+  [rel kmap]
+  (join rel kmap :right))
 
-(defn full-join [yrel kmap]
-  (join yrel kmap :full))
+(defn full-join [rel kmap]
+  (join rel kmap :full))
 
-(defn anti-join [yrel kmap]
+(defn anti-join [rel kmap]
   (comp
-   (left-join yrel kmap)
+   (left-join rel kmap)
    (select (apply every-pred (map #(comp nil? %) (vals kmap))))))
 
 (defn aggregate-by
-  "Returns an aggregated relation.
+  "Aggregates a relation by (possibly) multiple groupings.
 
   Aggregates on multiple aggregation levels in one single pass.
 
@@ -228,18 +228,21 @@
   agg-fn must be a reducing function with identity.
 
   Example:
-  (aggregate-by {:country {:country/total [+ :pollution]}
-                 [:country :county] {:county/total [+ :pollution]}})
-  => #{{:country/total 142 :country :UK}
-       {:county/total 97 :country :UK :county :London}
-       {:count/total 45 :country :UK :county :SouthWest}}
+  (|> #{{:category :a, :subcategory :x, :val 1}
+        {:category :a, :subcategory :x, :val 2}
+        {:category :a  :subcategory :y, :val 10}
+        {:category :a  :subcategory :y, :val 20}
+        {:category :b  :subcategory :Z  :val 100}}
+      (aggregate-by {[] {:total [+ :val]}
+                     :category {:total [+ :val]}
+                     [:category :subcategory] {:total [+ :val]}}))
 
-  Shorthand with only one grouping:
-  (aggregate-by :country {:country/total [+ :pollution]})
-
-  or
-
-  (aggregate-by [:country :county] {:avg [avg :pollution]})"
+  => #{{:total 30, :category :a, :subcategory :y}
+       {:total 100, :category :b, :subcategory :Z}
+       {:total 33, :category :a}
+       {:total 3, :category :a, :subcategory :x}
+       {:total 133}
+       {:total 100, :category :b}}"
 
   ([agg-by-map]
    (fn [rf]
@@ -281,9 +284,25 @@
    (aggregate-by {ks (apply hash-map key agg more)})))
 
 (defn aggregate-over
-  "Returns a relation with aggregations joined into rel.
+  "Aggregates and then joins those aggregates with self.
 
-  See aggregate-by."
+  See aggregate-by.
+
+  Example:
+  (|> #{{:category :a, :subcategory :x, :val 1}
+        {:category :a, :subcategory :x, :val 2}
+        {:category :a  :subcategory :y, :val 10}
+        {:category :a  :subcategory :y, :val 20}
+        {:category :b  :subcategory :Z  :val 100}}
+      (aggregate-over {[] {:total/sum [+ :val]}
+                       :category {:cat/sum [+ :val]}
+                       [:category :subcategory] {:subcat/sum [+ :val]}}))
+
+  => #{{:category :a, :subcategory :y, :val 20, :total/sum 133, :cat/sum 33, :subcat/sum 30}
+       {:category :a, :subcategory :y, :val 10, :total/sum 133, :cat/sum 33, :subcat/sum 30}
+       {:category :a, :subcategory :x, :val 1, :total/sum 133, :cat/sum 33, :subcat/sum 3}
+       {:category :a, :subcategory :x, :val 2, :total/sum 133, :cat/sum 33, :subcat/sum 3}
+       {:category :b, :subcategory :Z, :val 100, :total/sum 133, :cat/sum 100, :subcat/sum 100}}"
   ([agg-by-map]
    (fn [rf]
      (let [aggs (volatile! {})
@@ -338,12 +357,15 @@
    (aggregate-by {ks (apply hash-map key agg more)})))
 
 (defn aggregate
-  "Returns an aggregated relation.
-  aggs-map should be a map from key to a vector of agg-fn, key-fn.
-  agg-fn must be a reducing function with an additional zero arity function
-  that produces an initial value.
+  "Aggregates a relation.
 
-  Example: (aggregate {:album/length [+ :song/length]})"
+  aggs-map should be a map from key to a vector of agg-fn, key-fn.
+  agg-fn must be a reducing function with identity.
+
+  Example:
+  (|> #{{:val 1} {:val 2}}
+      (aggregate {:val [+ :val]}))
+  => #{{:val 3}}"
   ([aggs-map]
    (aggregate-by [] aggs-map))
   ([key agg & more]
@@ -397,34 +419,37 @@
                  kmap)})))
 
 (defn union
-  "Returns a relation that is the union of xrel and yrel."
-  [yrel]
+  "Distinct union with rel."
+  [rel]
   (comp
    (fn [rf]
      (fn
        ([] (rf))
-       ([res] (rf (reduce rf res yrel)))
+       ([res] (rf (reduce rf res rel)))
        ([res item] (rf res item))))
    (distinct)))
 
 (defn union-all
-  [yrel]
+  "Union with rel.
+
+  Keeps duplicated rows."
+  [rel]
   (fn [rf]
     (fn
       ([] (rf))
-      ([res] (rf (reduce rf res yrel)))
+      ([res] (rf (reduce rf res rel)))
       ([res item] (rf res item)))))
 
 (defn difference
-  "Returns a relation that is xrel without the elemens in yrel."
-  [yrel]
-  (comp (remove (set yrel))
+  "Distinct rows without the rows in rel."
+  [rel]
+  (comp (remove (set rel))
         (distinct)))
 
 (defn intersection
-  "Returns a relation that is the intersection of xrel and yrel."
-  [yrel]
-  (comp (filter (set yrel))
+  "Distinct rows that has are also in rel."
+  [rel]
+  (comp (filter (set rel))
         (distinct)))
 
 (defn stats-agg
@@ -443,7 +468,16 @@
              :count (inc cnt)
              :avg (/ (+ sum y) (inc cnt)))))
 
-(defn extend-stats [k]
+(defn extend-stats
+  "Extends stats generated by stats-agg.
+
+  Example:
+  (|> #{{:val 1} {:val 2}}
+      (aggregate {:val [stats-agg :val]})
+      (extend-stats :val))
+  => #{{:min-val 1, :max-val 2, :count 2, :avg-val 3/2, :sum-val 3}}"
+
+  [k]
   (let [ns (namespace k)]
     (map #(merge
            (core/dissoc % k)
