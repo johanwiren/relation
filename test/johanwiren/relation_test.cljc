@@ -142,7 +142,11 @@
   (is (nil? (|>last [])))
   (is (= 9 (|>last (range)
                    (take 10)
-                   (r/select odd?)))))
+                   (r/select odd?))))
+  (is (= [1 2]
+         (-> (range 10)
+             (|> (take 2))
+             (|> (map inc))))))
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"
@@ -159,7 +163,18 @@
     (is (= #{#:artist{:band-name "Iron Maiden"}
              #:artist{:band-name "The White Stripes"}}
            (|> artist
-             (r/project [:artist/band-name]))))))
+               (r/project [:artist/band-name])))))
+  (testing "Distinct"
+    (is (= #{{:count 1}}
+           (|> song
+               (r/project [:song/band-name])
+               (distinct)
+               (r/aggregate :count r/count-agg)))))
+  (testing "SQL-like projection"
+    (is (= #{{:count 16}}
+           (|> song
+               (r/project [:song/band-name])
+               (r/aggregate :count r/count-agg))))))
 
 (deftest select-test
   (testing "It selects rows"
@@ -720,6 +735,11 @@
       (r/rename {:dept/manager :emp/manager})
       (r/join :self/mgr {:mgr/name :emp/manager})
       (r/project-pred (comp #{"name" "id"} name)))
+
+  (|> song
+      (r/project [:song/band-name])
+      (distinct)
+      (r/aggregate :count r/count-agg))
 
   nil)
 
