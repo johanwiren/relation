@@ -116,65 +116,52 @@
    persistent!
    (update-vals persistent!)))
 
-(defn- -join [rel kmap kind]
-  (fn [rf]
-    (let [idx (index rel (vals kmap))
-          used-idx-keys (when (#{:full :right} kind)
-                          (volatile! #{}))
-          ks (keys kmap)]
-      (fn
-        ([] (rf))
-        ([res]
-         (if (#{:full :right} kind)
-           (let [yitems (->> (apply core/dissoc idx @used-idx-keys)
-                             (vals)
-                             (apply concat))]
-             (rf (reduce rf res yitems)))
-           (rf res)))
-        ([res item]
-         (let [idx-key (set/rename-keys (select-keys item ks) kmap)
-               found (get idx idx-key)]
-           (if found
-             (do
-               (when (#{:full :right} kind)
-                 (vswap! used-idx-keys conj idx-key))
-               (reduce rf res (map #(merge item %) found)))
-             (if (#{:full :outer :right} kind)
-               (rf res item)
-               res))))))))
+(defn- -join
+  ([rel kind join-kmap]
+   (-join rel kind join-kmap nil))
+  ([rel kind join-kmap recur-kmap]
+   (fn [rf]
+     (let [join-idx (index rel (vals join-kmap))
+           join-ks (keys join-kmap)
+           used-idx-keys (when (#{:full :right} kind)
+                           (volatile! #{}))
+           rec-idx (index rel (vals recur-kmap))
+           rec-ks (keys recur-kmap)]
+       (fn
+         ([] (rf))
+         ([res]
+          (if (#{:full :right} kind)
+            (let [yitems (->> (apply core/dissoc join-idx @used-idx-keys)
+                              (vals)
+                              (apply concat))]
+              (rf (reduce rf res yitems)))
+            (rf res)))
+         ([res item]
+          (let [join-idx-key (set/rename-keys (select-keys item join-ks) join-kmap)
+                join-found (get join-idx join-idx-key)]
+            (if join-found
+              (do
+                (when (#{:full :right} kind)
+                  (vswap! used-idx-keys conj join-idx-key))
+                (if (seq recur-kmap)
+                  (let [level 0]
+                    (loop [res (reduce rf res (map #(merge item % {::depth level}) join-found))
+                           level (inc level)
+                           items join-found]
+                      (if (seq items)
+                        (let [idx-key (set/rename-keys (select-keys (first items) rec-ks) recur-kmap)
+                              found (get rec-idx idx-key)]
+                          (recur
+                           (reduce rf res (map #(merge item % {::depth level}) found))
+                           (inc level)
+                           (into (rest items) found)))
+                        res)))
+                  (reduce rf res (map #(merge item %) join-found))))
+              (if (#{:full :outer :right} kind)
+                (rf res item)
+                res)))))))))
 
-(defn recursive-join
-  "Joins with relation rel using the corresponding attributes in join-kmap
-  For each found entry in rel, recursively joins rel on corresponding
-  attributes in recur-kmap.
-
-  Adds :johanwiren.relation/depth to joined entries."
-  [rel join-kmap recur-kmap]
-  (fn [rf]
-    (let [join-idx (index rel (vals join-kmap))
-          join-ks (keys join-kmap)
-          rec-idx (index rel (vals recur-kmap))
-          rec-ks (keys recur-kmap)]
-      (fn
-        ([] (rf))
-        ([res] (rf res))
-        ([res item]
-         (let [join-idx-key (set/rename-keys (select-keys item join-ks) join-kmap)
-               join-found (get join-idx join-idx-key)
-               level 0]
-           (loop [res (reduce rf res (map #(merge item % {::depth level}) join-found))
-                  level (inc level)
-                  items join-found]
-             (if (seq items)
-               (let [idx-key (set/rename-keys (select-keys (first items) rec-ks) recur-kmap)
-                     found (get rec-idx idx-key)]
-                 (recur
-                  (reduce rf res (map #(merge item % {::depth level}) found))
-                  (inc level)
-                  (into (rest items) found)))
-               res))))))))
-
-(defn- self-join [as kmap kind]
+(defn- self-join [as kmap recur-kmap kind]
   (fn [rf]
     (let [items (volatile! (transient []))]
       (fn
@@ -183,7 +170,7 @@
          (let [items (persistent! @items)
                f (comp
                   (map #(update-keys % (comp (partial keyword as) name)))
-                  (-join items kmap kind))]
+                  (-join items kind kmap recur-kmap))]
            (rf (reduce (f rf) res items))))
         ([res item]
          (vswap! items conj! item)
@@ -192,27 +179,40 @@
 (defn join
   "Joins with relation rel using the corresponding attributes in kmap.
 
+  When recur-kmap is specified, for each found entry in rel, recursively joins
+  rel on corresponding attributes in recur-kmap.
+  Adds :johanwiren.relation/depth to joined entries.
+
   Keys in rel will be merged into the matched row with rel taking precedence."
   ([rel kmap]
-   (join rel kmap :inner))
-  ([rel kmap kind]
+   (join rel kmap nil :inner))
+  ([rel kmap recur-kmap]
+   (join rel kmap recur-kmap :inner))
+  ([rel kmap recur-kmap kind]
    (if (and (qualified-keyword? rel)
           (= "self" (namespace rel)))
-     (self-join (name rel) kmap kind)
-     (-join rel kmap kind))))
+     (self-join (name rel) kmap recur-kmap kind)
+     (-join rel kind kmap recur-kmap))))
 
 (defn left-join
   "Same as join but always keeps all unmatched rows."
-  [rel kmap]
-  (join rel kmap :outer))
+  ([rel kmap]
+   (left-join rel kmap nil))
+  ([rel kmap recur-kmap]
+   (join rel kmap recur-kmap :outer)))
 
 (defn right-join
   "Same as join but always keep all rows in rel"
-  [rel kmap]
-  (join rel kmap :right))
+  ([rel kmap]
+   (right-join rel kmap nil))
+  ([rel kmap recur-kmap]
+   (join rel kmap recur-kmap :right)))
 
-(defn full-join [rel kmap]
-  (join rel kmap :full))
+(defn full-join
+  ([rel kmap]
+   (full-join rel kmap nil :full))
+  ([rel kmap recur-kmap kind]
+   (join rel kmap recur-kmap kind)))
 
 (defn anti-join [rel kmap]
   (comp

@@ -506,18 +506,18 @@
              {:genre/name "Metal" ::r/depth 1}
              {:genre/name "Popular" ::r/depth 2}}
            (|> song
-             (r/recursive-join genre
-                               {:song/genre :genre/name}
-                               {:genre/parent-id :genre/id})
+             (r/join genre
+                     {:song/genre :genre/name}
+                     {:genre/parent-id :genre/id})
              (r/project [:genre/name ::r/depth])))))
   (testing "It self joins recursively"
     (is (= #{{:genre/name "Popular" ::r/depth 1}
              {:genre/name "Metal" ::r/depth 0}}
            (|> genre
-             (r/select (comp #{"Metal"} :genre/name))
-             (r/recursive-join genre
-                               {:genre/name :genre/name}
-                               {:genre/parent-id :genre/id})
+             (r/join :self/root
+                     {:root/name :genre/name}
+                     {:genre/parent-id :genre/id})
+             (r/select (comp #{"Metal"} :root/name))
              (r/project [::r/depth :genre/name]))))))
 
 (deftest project-pred
