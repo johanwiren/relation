@@ -161,7 +161,16 @@
                 (rf res item)
                 res)))))))))
 
-(defn- self-join [as kmap recur-kmap kind]
+(defn as
+  "Qualifies all keys in row with given namespace.
+
+  namespace must be a keyword, string or symbol"
+  [namespace]
+  (let [namespace (name namespace)]
+    (map (fn [row]
+           (update-keys row #(keyword namespace (name %)))))))
+
+(defn- self-join [as' kmap recur-kmap kind]
   (fn [rf]
     (let [items (volatile! (transient []))]
       (fn
@@ -169,7 +178,7 @@
         ([res]
          (let [items (persistent! @items)
                f (comp
-                  (map #(update-keys % (comp (partial keyword as) name)))
+                  (as as')
                   (-join items kind kmap recur-kmap))]
            (rf (reduce (f rf) res items))))
         ([res item]

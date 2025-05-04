@@ -613,9 +613,16 @@
                        (r/project [:artist/name])))))))
 
 (deftest rollup-test
-  (testing "It generates rollups"
+  (testing "It generates rollup groupings"
     (is (= {[] {} [:a :b :c :d] {} [:a :b :c] {} [:a] {}}
            (r/rollup {} :a [:b :c] :d)))))
+
+(deftest as-test
+  (testing "It renames things"
+    (is (= #{#:tune{:band-name "Iron Maiden"}}
+           (|> song
+               (r/as :tune)
+               (r/project [:tune/band-name]))))))
 
 (comment
   (require '[kixi.stats.core :as stats]
@@ -754,5 +761,12 @@
 
   (r/rollup {} :a [:b :c] :d)
 
-  nil)
+  (|> song
+      (r/join (|> song (r/aggregate-by :song/name :song/avg-length [avg :song/length]))
+              {:song/name :song/name}))
 
+
+  (|> song
+      (r/as :tune))
+
+  nil)
