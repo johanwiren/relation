@@ -36,11 +36,11 @@
   (transduce (reduce comp xforms) --first relation))
 
 (defn- --last []
-  (let [prev (volatile! nil)]
+  (let [last (volatile! nil)]
     (fn
       ([] nil)
-      ([x] @prev)
-      ([res x] (vreset! prev x) res))))
+      ([_] @last)
+      ([res x] (vreset! last x) res))))
 
 (defn |>last
   [relation & xforms]
