@@ -22,6 +22,10 @@
   [relation & xforms]
   (into [] (reduce comp xforms) relation))
 
+(defn |>eduction
+  [relation & xforms]
+  (eduction (reduce comp xforms) relation))
+
 (defn- --first
   ([] nil)
   ([x] x)

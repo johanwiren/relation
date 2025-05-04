@@ -182,6 +182,14 @@
     (is (= #{}
            (|> song
              (r/join #{} {})))))
+  (testing "Eduction"
+    (is (= #{{:song/name "22 Acacia Avenue", :artist/band-name "Iron Maiden"}}
+           (|> artist
+               (r/join (r/|>eduction song
+                                     (r/sort-by :song/name)
+                                     (take 1))
+                       {:artist/band-name :song/band-name})
+               (r/project [:song/name :artist/band-name])))))
   (testing "Yrel precedence when merging keys"
     (is (= #{{:b/k 1, :common 2, :a/k 1}}
            (|> #{{:a/k 1 :common 1}}
