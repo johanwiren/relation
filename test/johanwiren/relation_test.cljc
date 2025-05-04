@@ -169,12 +169,12 @@
            (|> song
                (r/project [:song/band-name])
                (distinct)
-               (r/aggregate :count r/count-agg)))))
+               (r/aggregate :count r/count)))))
   (testing "SQL-like projection"
     (is (= #{{:count 16}}
            (|> song
                (r/project [:song/band-name])
-               (r/aggregate :count r/count-agg))))))
+               (r/aggregate :count r/count))))))
 
 (deftest select-test
   (testing "It selects rows"
@@ -391,7 +391,7 @@
                     {:min 202, :max 422, :count 8, :avg #?(:clj 2259/8 :cljs 282.375) :sum 2259},
                     :album-name "Iron Maiden"}}
            (|> song
-             (r/aggregate-by :song/album-name {:song/length-stats [r/stats-agg :song/length]})))))
+             (r/aggregate-by :song/album-name {:song/length-stats [r/simple-stats-agg :song/length]})))))
   (testing "It extends stats"
     (is (= #{#:song{:album-name "Iron Maiden",
                     :min-length 202,
@@ -406,8 +406,8 @@
                     :avg-length #?(:clj 2351/8 :cljs 293.875),
                     :sum-length 2351}}
            (|> song
-             (r/aggregate-by :song/album-name {:song/length [r/stats-agg :song/length]})
-             (r/extend-stats :song/length))))))
+             (r/aggregate-by :song/album-name {:song/length [r/simple-stats-agg :song/length]})
+             (r/extend-simple-stats :song/length))))))
 
 (deftest aggregate-over-test
   (testing "It joins aggregates"
@@ -443,10 +443,10 @@
             (r/project-ns [:global :model :category]))))))
 
 (deftest aggs-test
-  (testing "count-agg"
+  (testing "count"
     (is (= #{{:song/count 16}}
            (|> song
-             (r/aggregate {:song/count r/count-agg})))))
+             (r/aggregate {:song/count r/count})))))
   (testing "set-agg"
     (is (= #{#:album{:names #{"The Number of the Beast" "Iron Maiden"}}}
            (|> song
@@ -461,7 +461,7 @@
               :song/count 16}}
            (|> song
              (r/aggregate {:album/names [r/set-agg :song/album-name]
-                           :song/count r/count-agg}))))))
+                           :song/count r/count}))))))
 
 (deftest expand-kv-test
   (testing "It expands maps"
@@ -471,7 +471,7 @@
              #:song{:key :min, :val 200}
              #:song{:key :count, :val 16}}
            (|> song
-             (r/aggregate {:song/length [r/stats-agg :song/length]})
+             (r/aggregate {:song/length [r/simple-stats-agg :song/length]})
              (r/expand-kv :song/length))))))
 
 (deftest extend-kv-test
@@ -489,7 +489,7 @@
                     :avg #?(:clj 2351/8 :cljs 293.875),
                     :sum 2351}}
            (|> song
-             (r/aggregate-by :song/album-name {:song/length [r/stats-agg :song/length]})
+             (r/aggregate-by :song/album-name {:song/length [r/simple-stats-agg :song/length]})
              (r/extend-kv :song/length))))))
 
 (deftest expand-seq
@@ -551,8 +551,8 @@
              #:song{:name "Hallowed Be Thy Name"}
              #:song{:name "Phantom Of the Opera"}}
            (|> song
-             (r/aggregate-over :song/album-name {:album/song-length [r/stats-agg :song/length]})
-             (r/extend-stats :album/song-length)
+             (r/aggregate-over :song/album-name {:album/song-length [r/simple-stats-agg :song/length]})
+             (r/extend-simple-stats :album/song-length)
              (r/extend :song/longer-than-avg?
                (fn [{:song/keys [length]
                      :album/keys [avg-song-length]}]
@@ -704,7 +704,7 @@
 
   ;; Integrates wonderfully with kixi stats
   (|> song
-    (r/aggregate-by :song/album-name {:album/song-length [r/stats-agg :song/length]
+    (r/aggregate-by :song/album-name {:album/song-length [r/simple-stats-agg :song/length]
                                       :album/song-lengths [r/vec-agg :song/length]
                                       :album/variance-length [stats/variance-p :song/length]})
     (r/extend-kv :album/song-length)
@@ -747,7 +747,12 @@
   (|> song
       (r/project [:song/band-name])
       (distinct)
-      (r/aggregate :count r/count-agg))
+      (r/aggregate :count r/count))
+
+  (|> song
+      (r/aggregate :count r/count))
+
+  (r/rollup {} :a [:b :c] :d)
 
   nil)
 
