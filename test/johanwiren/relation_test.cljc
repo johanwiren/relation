@@ -338,19 +338,22 @@
            (|> song
              (r/aggregate-by {:song/album-name {:album/length [+ :song/length]}})))))
   (testing "It aggregates on multiple levels"
-    (is (= [{:global/avg-price #?(:clj 3497/3 :cljs 1165.6666666666667)}
-            {:category/avg-price 999 :category "iphone"}
-            {:model/avg-price 949 :category "iphone" :model "iPhone Eclipse"}
-            {:model/avg-price 1049 :category "iphone" :model "iPhone Pulse"}
-            {:category/avg-price 1299 :category "mac"}
-            {:model/avg-price 849 :category "mac" :model "Mac Mini Turbo"}
-            {:model/avg-price 1599 :category "mac" :model "MacBook Airflow"}]
-           (|>vec
+    (is (= #{{:avg-price #?(:clj 3497/3 :cljs 1165.6666666666667)}
+             {:avg-price 999 :category "iphone"}
+             {:avg-price 949 :category "iphone" :model "iPhone Eclipse"}
+             {:avg-price 1049 :category "iphone" :model "iPhone Pulse"}
+             {:avg-price 1299 :category "mac"}
+             {:avg-price 849 :category "mac" :model "Mac Mini Turbo"}
+             {:avg-price 1599 :category "mac" :model "MacBook Airflow"}}
+           (|>
             apple-sales
-            (r/aggregate-by {[] {:global/avg-price [avg :price]}
-                             :category {:category/avg-price [avg :price]}
-                             [:category :model] {:model/avg-price [avg :price]}})
-            (r/sort-by (juxt :category :model))))))
+            (r/aggregate-by {[] {:avg-price [avg :price]}
+                             :category {:avg-price [avg :price]}
+                             [:category :model] {:avg-price [avg :price]}}))
+           (|>
+            apple-sales
+            (r/aggregate-by (r/rollup {:avg-price [avg :price]}
+                                      :category :model))))))
   (testing "Joining aggs"
     (is (= #{{:category "iphone"
               :model "iPhone Eclipse"
@@ -608,6 +611,11 @@
                        |>
                        (r/select (comp #{"The White Stripes"} :artist/band-name))
                        (r/project [:artist/name])))))))
+
+(deftest rollup-test
+  (testing "It generates rollups"
+    (is (= {[] {} [:a :b :c :d] {} [:a :b :c] {} [:a] {}}
+           (r/rollup {} :a [:b :c] :d)))))
 
 (comment
   (require '[kixi.stats.core :as stats]

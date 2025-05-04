@@ -4,7 +4,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set])
-  (:refer-clojure :exclude [assoc dissoc update extend update sort-by]))
+  (:refer-clojure :exclude [assoc count dissoc update extend update sort-by]))
 
 (defn |>
   [relation & xforms]
@@ -246,7 +246,10 @@
        {:total 33, :category :a}
        {:total 3, :category :a, :subcategory :x}
        {:total 133}
-       {:total 100, :category :b}}"
+       {:total 100, :category :b}}
+
+  This can be expressed using a rollup:
+  (aggregate-by (rollup {:total [+ :val]} :category :subcategory))"
 
   ([agg-by-map]
    (fn [rf]
@@ -531,9 +534,19 @@
   Collects all values into a set."
   (conj-agg hash-set))
 
-(def count-agg
-  "Count aggregation function
+(def count
+  "Count aggregation
 
   Returns the rowcount."
   [+ (constantly 1)])
 
+(defn rollup
+  "Helper function to generate agg-by-map needed for aggregate by"
+  [agg-map & rollups]
+  (->> rollups
+       (iterate butlast)
+       (take-while seq)
+       (cons (list))
+       (reduce (fn [agg-by-map grouping]
+                 (core/assoc agg-by-map (flatten grouping) agg-map))
+               {})))
