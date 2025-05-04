@@ -219,6 +219,29 @@
    (left-join rel kmap)
    (select (apply every-pred (map #(comp nil? %) (vals kmap))))))
 
+(defn- -aggs-reducer [row]
+  (fn [aggs ks aggs-map]
+    (let [by (select-keys row (if (keyword? ks) [ks] ks))]
+      (reduce-kv (fn [aggs' k [agg-fn key-fn]]
+                   (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn row))]
+                     (core/assoc aggs'
+                                 by
+                                 (core/assoc (get aggs' by {::by ks})
+                                             k
+                                             new))))
+                 aggs
+                 aggs-map))))
+
+(defn- -complete-aggs [aggs agg-by-map]
+  (into {}
+        (map (fn [[by row]]
+               [by (merge-with (fn [[agg-fn _] res]
+                                 ;; Invoke the completing function
+                                 (agg-fn res))
+                               (get agg-by-map (::by row))
+                               (merge (core/dissoc row ::by) by))]))
+        aggs))
+
 (defn aggregate-by
   "Aggregates a relation by (possibly) multiple groupings.
 
@@ -257,31 +280,15 @@
        (fn
          ([] (rf))
          ([res]
-          (->> @aggs
-               (map (fn [[by row]]
-                      (merge-with (fn [[agg-fn _] res]
-                                    ;; Invoke the completing function
-                                    (agg-fn res))
-                                  (get agg-by-map (::by row))
-                                  (merge row by))))
-               (map (fn [row] (core/dissoc row ::by)))
+          (->> (-complete-aggs @aggs agg-by-map)
+               vals
                (reduce rf res)
                rf))
          ([res item]
           (vreset!
            aggs
            (reduce-kv
-            (fn [aggs ks aggs-map]
-              (let [by (select-keys item (if (keyword? ks) [ks] ks))]
-                (reduce-kv (fn [aggs' k [agg-fn key-fn]]
-                             (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
-                               (core/assoc aggs'
-                                           by
-                                           (core/assoc (get aggs' by {::by ks})
-                                                       k
-                                                       new))))
-                           aggs
-                           aggs-map)))
+            (-aggs-reducer item)
             @aggs
             agg-by-map))
           res)))))
@@ -318,15 +325,7 @@
        (fn
          ([] (rf))
          ([res]
-          (let [completed-aggs
-                (into {}
-                      (map (fn [[ks row]]
-                             [ks (merge-with (fn [[agg-fn _] res]
-                                              ;; Invoke the completing function
-                                              (agg-fn res))
-                                            (get agg-by-map (::by row))
-                                            (core/dissoc row ::by))]))
-                      @aggs)]
+          (let [completed-aggs (-complete-aggs @aggs agg-by-map)]
             (->> @items
                  persistent!
                  (reduce
@@ -341,22 +340,10 @@
                  rf)))
          ([res item]
           (vswap! items conj! item)
-          (vreset!
-           aggs
-           (reduce-kv
-            (fn [aggs ks aggs-map]
-              (let [by (select-keys item (if (keyword? ks) [ks] ks))]
-                (reduce-kv (fn [aggs' k [agg-fn key-fn]]
-                             (let [new (agg-fn (get-in aggs' [by k] (agg-fn)) (key-fn item))]
-                               (core/assoc aggs'
-                                           by
-                                           (core/assoc (get aggs' by {::by ks})
-                                                       k
-                                                       new))))
-                           aggs
-                           aggs-map)))
-            @aggs
-            agg-by-map))
+          (vreset! aggs (reduce-kv
+                         (-aggs-reducer item)
+                         @aggs
+                         agg-by-map))
           res)))))
   ([ks agg]
    (aggregate-over {ks agg}))
