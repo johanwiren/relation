@@ -205,6 +205,16 @@
                                      (take 1))
                        {:artist/band-name :song/band-name})
                (r/project [:song/name :artist/band-name])))))
+  (testing "Natural join"
+    (is (= #{#:artist{:name "Steve Harris"}
+             #:artist{:name "Bruce Dickinson"}
+             #:artist{:name "Dave Murray"}
+             #:artist{:name "Adrian Smith"}
+             #:artist{:name "Nicko McBrain"}}
+           (|> song
+               (r/rename {:song/band-name :artist/band-name})
+               (r/join artist)
+               (r/project [:artist/name])))))
   (testing "Yrel precedence when merging keys"
     (is (= #{{:b/k 1, :common 2, :a/k 1}}
            (|> #{{:a/k 1 :common 1}}

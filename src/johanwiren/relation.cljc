@@ -116,6 +116,22 @@
    persistent!
    (update-vals persistent!)))
 
+(defn- -natural-join
+  [rel]
+  (fn [rf]
+    (let [idx (volatile! {})
+          ks (volatile! #{})]
+      (fn
+        ([] (rf))
+        ([res] (rf res))
+        ([res item]
+         (when (empty? @ks)
+           (let [ks' (set/intersection (set (keys (first rel))) (set (keys item)))]
+             (vreset! ks ks')
+             (vreset! idx (index rel ks'))))
+         (let [found (get @idx (select-keys item @ks))]
+           (reduce rf res (map #(merge item %) found))))))))
+
 (defn- -join
   ([rel kind join-kmap]
    (-join rel kind join-kmap nil))
@@ -193,6 +209,8 @@
   Adds :johanwiren.relation/depth to joined entries.
 
   Keys in rel will be merged into the matched row with rel taking precedence."
+  ([rel]
+   (-natural-join rel))
   ([rel kmap]
    (join rel kmap nil :inner))
   ([rel kmap recur-kmap]
