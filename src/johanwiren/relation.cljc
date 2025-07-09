@@ -528,7 +528,19 @@
             (fn [k']
               (keyword ns (name k'))))))))
 
-(defn expand-seq [k]
+(defn expand-seq
+  "Expands a sequence in a relation into separate rows.
+
+  Example:
+  (|> #{{:a [1 2]}
+        {:a [3 4]}}
+      (expand-seq :a))
+
+  => #{{:a 1}
+       {:a 3}
+       {:a 4}
+       {:a 2}}"
+  [k]
   (mapcat (fn [row]
             (map (fn [val]
                    (core/assoc row k val))
