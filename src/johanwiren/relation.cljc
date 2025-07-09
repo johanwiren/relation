@@ -4,7 +4,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set])
-  (:refer-clojure :exclude [assoc count dissoc update extend update sort-by]))
+  (:refer-clojure :exclude [assoc count dissoc merge update extend update sort-by]))
 
 (defn |>
   [relation & xforms]
@@ -51,6 +51,19 @@
 (defn |>normalized
   [relation & forms]
   (transduce (reduce comp forms) normalize relation))
+
+(defn merge
+  "Faster version of clojure.core/merge."
+  ([] nil)
+  ([m] m)
+  ([m1 m2]
+   (persistent!
+    (reduce-kv (fn [m k v]
+                 (assoc! m k v))
+               (transient m1)
+               m2)))
+  ([m1 m2 & more]
+   (reduce merge (merge m1 m2) more)))
 
 (defn select
   "Selects rows for which (pred row) returns true."
