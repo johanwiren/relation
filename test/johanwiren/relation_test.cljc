@@ -473,17 +473,6 @@
              (r/aggregate {:album/names [r/set-agg :song/album-name]
                            :song/count r/count}))))))
 
-(deftest expand-kv-test
-  (testing "It expands maps"
-    (is (= #{#:song{:key :max, :val 428}
-             #:song{:key :sum, :val 4610}
-             #:song{:key :avg, :val #?(:clj 2305/8 :cljs 288.125)}
-             #:song{:key :min, :val 200}
-             #:song{:key :count, :val 16}}
-           (|> song
-             (r/aggregate {:song/length [r/simple-stats-agg :song/length]})
-             (r/expand-kv :song/length))))))
-
 (deftest extend-kv-test
   (testing "It extends maps"
     (is (= #{#:song{:album-name "Iron Maiden",

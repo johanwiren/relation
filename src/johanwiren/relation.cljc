@@ -528,15 +528,6 @@
             (fn [k']
               (keyword ns (name k'))))))))
 
-(defn expand-kv [k]
-  (let [ns (namespace k)]
-    (mapcat (fn [row]
-              (map (fn [[key val]]
-                     (core/assoc (core/dissoc row k)
-                                 (keyword ns "key") key
-                                 (keyword ns "val") val))
-                   (k row))))))
-
 (defn expand-seq [k]
   (mapcat (fn [row]
             (map (fn [val]

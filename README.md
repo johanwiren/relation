@@ -115,7 +115,6 @@ Relation provides a rich set of operations
 * difference
 * intersection
 * extend-kv
-* expand-kv
 * expand-seq
 
 ### Aggregations
