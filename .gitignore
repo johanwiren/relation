@@ -30,3 +30,4 @@
 /target
 
 cljs-test-runner-out
+.aider*

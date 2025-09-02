@@ -117,7 +117,7 @@
   [ks]
   (map #(select-keys % ks)))
 
-(defn- index
+(defn index
   "Returns a map of distinct values for ks to distinct rows for those values."
   [rel ks]
   (->
@@ -399,6 +399,7 @@
   Example:
   (|> #{{:val 1} {:val 2}}
       (aggregate {:val [+ :val]}))
+
   => #{{:val 3}}"
   ([aggs-map]
    (aggregate-by [] aggs-map))
@@ -505,8 +506,8 @@
   (|> #{{:val 1} {:val 2}}
       (aggregate {:val [simple-stats-agg :val]})
       (extend-stats :val))
-  => #{{:min-val 1, :max-val 2, :count 2, :avg-val 3/2, :sum-val 3}}"
 
+  => #{{:min-val 1, :max-val 2, :count 2, :avg-val 3/2, :sum-val 3}}"
   [k]
   (let [ns (namespace k)]
     (map #(merge
@@ -519,7 +520,15 @@
                          (name stat-k)
                          (str (name stat-k) "-" (name k))))))))))
 
-(defn extend-kv [k]
+(defn extend-kv
+  "Extends a key-val attribute.
+
+  Example:
+  (|> #{{:nested {:key :val}}}
+      (extend-kv :nested))
+
+  => #{{:key :val}}"
+  [k]
   (let [ns (namespace k)]
     (map #(merge
            (core/dissoc % k)

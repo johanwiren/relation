@@ -1,6 +1,7 @@
 (ns johanwiren.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]])
+            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]]
+            [johanwiren.rmtm :as rmtm])
   #?(:cljs (:require-macros johanwiren.relation)))
 
 (def genre #{{:genre/id 0
@@ -627,48 +628,6 @@
   (require '[kixi.stats.core :as stats]
            '[clojure.set :as s])
 
-  (def test-rel
-    (let [n 200000]
-      (map (fn [i] {:a i
-                    :b (rand-int n)
-                    :c (rand-int n)
-                    :d (rand-int n)})
-           (range n))))
-
-  (time
-   (count (|> test-rel (r/join test-rel {:b :c}))))
-
-  (time
-   (count (s/join test-rel test-rel {:b :c})))
-
-  (|> [{:a/k 1} {:a/k 1}]
-    (r/aggregate :b [+ :a/k]))
-
-  (clojure.set/join #{{:a/k 1 :common 1}
-                      {:a/k 2 :common 2}}
-                    #{{:b/k 1 :common 2}
-                      {:c 1}
-                      {:c 2}}
-                    {:a/k :b/k})
-
-  (clojure.set/join #{{:a/a 1 :a/b 1}}
-                    #{{:a/a 1 :a/c 1}} {:a/a :a/a})
-
-  (|> #{{:a/a 1 :a/b 1}}
-    (r/join #{{:a/a 1 :a/c 1}} {:a/a :a/a}))
-
-  (|> #{{:a/k 1 :common 1}}
-    (r/join #{{:b/k 1 :common 2}} {:a/k :b/k}))
-
-  (= (|> artist
-       (r/join song {:artist/band-name :song/band-name}))
-     (clojure.set/join artist song {:artist/band-name :song/band-name}))
-
-  (= (|> song
-       (r/join artist {:song/band-name :artist/band-name}))
-     (clojure.set/join song artist {:song/band-name :artist/band-name}))
-
-
   (let [n 1000]
     (print "clojure.set ")
     (time
@@ -682,31 +641,54 @@
     (print "relation|> ")
     (time
      (dotimes [_ n]
-       (|>vec song
+       (|> song
          (r/join artist {:song/band-name :artist/band-name})
          (r/join song {:artist/band-name :song/band-name})
          (r/project [:artist/band-name])
          (r/sort-by :artist/band-name))
        nil)))
 
+  (let [n 1000]
+    (print "Flat ")
+    (time
+     (dotimes [_ n]
+       (|> song
+           (r/join artist {:song/band-name :artist/band-name})
+           (r/join song {:artist/band-name :song/band-name})
+           (r/project [:artist/band-name])
+           (r/sort-by :artist/band-name))))
+    (print "Nested ")
+    (time
+     (dotimes [_ n]
+       (|> song
+           (r/join (r/|>eduction
+                    artist
+                    (r/join song {:artist/band-name :song/band-name}))
+                   {:song/band-name :artist/band-name})
+           (r/project [:artist/band-name])
+           (r/sort-by :artist/band-name)))))
+
   (require '[criterium.core :as c])
 
   (c/quick-bench
    (-> song
        (s/join artist {:song/band-name :artist/band-name})
-       (s/project [:artist/band-name])
-       (->> (sort-by :artist/band-name))))
+       (->> (sort-by :artist/band-name))
+       (s/project [:artist/band-name])))
 
   (c/quick-bench
    (|> song
      (r/join artist {:song/band-name :artist/band-name})
-     (r/project [:artist/band-name])
-     (r/sort-by :artist/band-name)))
+     (r/sort-by :artist/band-name)
+     (r/project [:artist/band-name])))
 
   (|> song
     (r/join artist {:song/band-name :artist/band-name})
-    (r/aggregate-by :song/album-name {:album/length [+ :song/length]
-                                      :album/artists [r/set-agg :artist/name]}))
+    (r/aggregate-over :song/album-name :album/artists [r/set-agg :artist/name])
+    (r/project-ns [:song :album])
+    (distinct)
+    (r/aggregate-over :song/album-name {:album/length [+ :song/length]
+                                        :album/tracks r/count}))
 
   ;; Integrates wonderfully with kixi stats
   (|> song
@@ -720,13 +702,6 @@
     (map :song/length)
     (map inc))
 
-  (|> #{{:tree-node 3 :some-key :val}
-        {:tree-node 2 :some-other-key :val}}
-    (r/recursive-join #{{:node 1 :parent 0}
-                        {:node 2 :parent 1}
-                        {:node 3 :parent 2}}
-                      {:tree-node :node}
-                      {:parent :node}))
 
   nil)
 
@@ -767,5 +742,89 @@
 
   (|> song
       (r/as :tune))
+
+  nil)
+
+
+(def db {:genre (rmtm/relmap genre {:genre/parent-id :genre/id})})
+
+#_(rmtm/query db {:genre [:genre/id {:genre/parent-id [:genre/name]}]})
+
+(def db {:song (rmtm/relmap song {:song/album-name :album/name} :song/name)
+         :artist (rmtm/relmap artist {} :album/name)})
+
+#_(rmtm/query db {:song [:song/name {:song/band-name [:artist/name]}]})
+
+(def db {:emp (rmtm/relmap employee {:emp/dept-name :dept/name} :emp/id)
+         :dept (rmtm/relmap dept {} :dept/name)})
+
+(rmtm/query db {:emp [:emp/name {:emp/dept-name [:dept/manager :dept/name]}]})
+
+
+(-> (rmtm/rmdb {:emp :emp/id :dept :dept/name} {:emp/dept-name :dept/name} employee dept)
+    (rmtm/query {:emp [:emp/name {:emp/dept-name [:dept/manager :dept/name]}]}))
+
+(-> (rmtm/rmdb {:emp :emp/id :dept :dept/name} {:emp/dept-name :dept/name} employee dept))
+
+#_(-> {:song song
+     :artist artist}
+    (rmtm/with :bulk
+                 :bulk/name
+                 rmtm/|>
+                 :song
+                 (take 2)
+                 (r/as :bulk))
+    (update :song r/|> (take 0)))
+
+(def db {:song song :artist artist})
+
+(-> db
+    #_(rmtm/with :bob
+               rmtm/from
+               :song
+               #_(rmtm/limit 2))
+    (rmtm/from :song))
+
+(-> (rmtm/rmdb {:song :song/name :genre :genre/id}
+               {;:song/genre :genre/name
+                :genre/parent-id :genre/id}
+               song
+               genre)
+    (rmtm/validate!)
+    #_(rmtm/query {:song [:song/name {:song/genre {:genre/parent-id [:genre/name]}}]}))
+
+
+(let [rel1 #{{:default/date :d1
+              :default/node-id :n1}
+             {:default/date :d2
+              :default/node-id :n1}}
+      rel2 #{{:date :d1
+              :node-id :n1}
+             #_{:date :d2
+                :node-id :n1}}]
+  (|> rel1
+   (r/left-join rel2 {:default/date :date
+                      :default/node-id :node-id
+                      :none :none})))
+
+(comment
+  (def song-artist
+    (r/|> song
+          (r/join artist {:song/band-name :artist/band-name})
+          (r/join genre {:song/genre :genre/name})))
+
+  (def empties (repeat 100 {}))
+
+  (time (apply r/merge empties))
+
+  (time
+   (dotimes [_ 100000]
+     (apply r/merge empties)))
+
+  (time
+   (dotimes [_ 100000]
+     (apply merge empties)))
+
+  (.capacity {:a 2})
 
   nil)
