@@ -1,7 +1,6 @@
 (ns johanwiren.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]]
-            [johanwiren.rmtm :as rmtm])
+            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]])
   #?(:cljs (:require-macros johanwiren.relation)))
 
 (def genre #{{:genre/id 0
