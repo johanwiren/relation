@@ -538,7 +538,9 @@
            (update-keys
             (k %)
             (fn [k']
-              (keyword ns (name k'))))))))
+              (if (namespace k')
+                k'
+                (keyword ns (name k')))))))))
 
 (defn expand-seq
   "Expands a sequence in a relation into separate rows.
