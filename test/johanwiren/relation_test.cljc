@@ -329,6 +329,17 @@
             #:artist{:name "Steve Harris"}]
            (|>vec artist
                   (r/sort-by :artist/name)
+                  (r/project [:artist/name])))))
+  (testing "It sorts with comparator"
+    (is (= [#:artist{:name "Steve Harris"}
+            #:artist{:name "Nicko McBrain"}
+            #:artist{:name "Meg White"}
+            #:artist{:name "Jack White"}
+            #:artist{:name "Dave Murray"}
+            #:artist{:name "Bruce Dickinson"}
+            #:artist{:name "Adrian Smith"}]
+           (|>vec artist
+                  (r/sort-by :artist/name (fn [a b] (compare b a)))
                   (r/project [:artist/name]))))))
 
 (defn avg

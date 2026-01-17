@@ -406,20 +406,23 @@
   ([key agg & more]
    (aggregate-by [] (apply hash-map key agg more))))
 
-(defn sort-by [keyfn]
-  (fn [rf]
-    (let [items (volatile! (transient []))]
-      (fn
-        ([] (rf))
-        ([res]
-         (->> @items
-              persistent!
-              (core/sort-by keyfn)
-              (reduce rf res)
-              rf))
-        ([res item]
-         (vswap! items conj! item)
-         res)))))
+(defn sort-by
+  ([keyfn]
+   (sort-by keyfn compare))
+  ([keyfn compare-fn]
+   (fn [rf]
+     (let [items (volatile! (transient []))]
+       (fn
+         ([] (rf))
+         ([res]
+          (->> @items
+               persistent!
+               (core/sort-by keyfn compare-fn)
+               (reduce rf res)
+               rf))
+         ([res item]
+          (vswap! items conj! item)
+          res))))))
 
 (defn- normalize
   "Normalizes a relation.
