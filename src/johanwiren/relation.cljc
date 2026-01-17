@@ -552,11 +552,13 @@
        {:a 3}
        {:a 4}
        {:a 2}}"
-  [k]
-  (mapcat (fn [row]
-            (map (fn [val]
-                   (core/assoc row k val))
-                 (k row)))))
+  ([k]
+   (expand-seq k k))
+  ([k1 k2]
+   (mapcat (fn [row]
+             (map (fn [val]
+                    (core/assoc row k2 val))
+                  (k1 row))))))
 
 ;; Helpers
 
