@@ -175,7 +175,12 @@
                res))))))))
 
 (defn as
-  "Qualifies all keys in row with given namespace.
+  "Namespaces keys.
+
+  Overwrites the current namespace for keys, if any.
+
+  :key -> :namespace/key
+  :existing-ns/key -> :namespace/key
 
   namespace must be a keyword, string or symbol"
   ([]
@@ -188,6 +193,12 @@
             (update-keys row #(keyword namespace (name %))))))))
 
 (defn qualify
+  "Qualifies all keys in row with given namespace.
+
+  :key -> :prefix/key
+  :ns/key -> :prefix.ns/key
+
+  namespace must be a keyword, string or symbol"
   [prefix]
   (map (fn [row]
          (update-keys row
