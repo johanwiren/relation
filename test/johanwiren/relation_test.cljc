@@ -620,3 +620,10 @@
                (r/as :tune)
                (r/project [:tune/band-name]))))))
 
+(deftest update-keys-test
+  (testing "It updates keys"
+    (is (= #{#{"album-name" "band-name" "name" "genre" "number" "length"}}
+           (|>set song
+                  (take 1)
+                  (r/update-keys (comp str name))
+                  (map (comp set keys)))))))

@@ -4,7 +4,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set])
-  (:refer-clojure :exclude [assoc count dissoc merge update extend update sort-by]))
+  (:refer-clojure :exclude [assoc count dissoc merge update-keys extend update sort-by]))
 
 (defn |>
   [relation & xforms]
@@ -52,6 +52,25 @@
   [relation & forms]
   (transduce (reduce comp forms) normalize relation))
 
+;; Relational versions of clojre.core functions
+
+(defn assoc
+  "Associates key(s) and val(s) to all rows."
+  [key val & kvs]
+  (map #(apply core/assoc % key val kvs)))
+
+(defn dissoc
+  "Disassociates key(s) from all rows."
+  [key & keys]
+  (map #(apply core/dissoc % key keys)))
+
+(defn update-keys
+  "Updates keys, like clojure.core/update-keys"
+  [f]
+  (map #(core/update-keys % f)))
+
+;;
+
 (defn merge
   "Faster version of clojure.core/merge."
   ([] nil)
@@ -70,20 +89,12 @@
   [pred]
   (filter pred))
 
-(defn assoc
-  "Associates key(s) and val(s) to all rows."
-  [key val & kvs]
-  (map #(apply core/assoc % key val kvs)))
-
-(defn dissoc
-  "Disassociates key(s) from all rows."
-  [key & keys]
-  (map #(apply core/dissoc % key keys)))
 
 (defn rename
   "Renames keys on all rows using kmap."
   [kmap]
   (map #(set/rename-keys % kmap)))
+
 
 (defn extend
   "Associates k to each row with the value of (f row)"
@@ -184,13 +195,11 @@
 
   namespace must be a keyword, string or symbol"
   ([]
-   (map (fn [row]
-          (update-keys row (comp keyword name)))))
+   (update-keys (comp keyword name)))
 
   ([namespace]
    (let [namespace (name namespace)]
-     (map (fn [row]
-            (update-keys row #(keyword namespace (name %))))))))
+     (update-keys #(keyword namespace (name %))))))
 
 (defn qualify
   "Qualifies all keys in row with given namespace.
@@ -200,13 +209,11 @@
 
   namespace must be a keyword, string or symbol"
   [prefix]
-  (map (fn [row]
-         (update-keys row
-                      (fn [k]
-                        (let [cur-ns (namespace k)
-                              new-ns (cond-> (name prefix)
-                                       cur-ns (str "." cur-ns))]
-                          (keyword new-ns (name k))))))))
+  (update-keys (fn [k]
+                 (let [cur-ns (namespace k)
+                       new-ns (cond-> (name prefix)
+                                cur-ns (str "." cur-ns))]
+                   (keyword new-ns (name k))))))
 
 (defn- self-join [as' kmap kind]
   (fn [rf]
@@ -516,7 +523,7 @@
   (let [ns (namespace k)]
     (map #(merge
            (core/dissoc % k)
-           (update-keys
+           (core/update-keys
             (k %)
             (fn [stat-k]
               (keyword ns
@@ -536,7 +543,7 @@
   (let [ns (namespace k)]
     (map #(merge
            (core/dissoc % k)
-           (update-keys
+           (core/update-keys
             (k %)
             (fn [k']
               (if (namespace k')
