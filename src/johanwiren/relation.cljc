@@ -216,8 +216,8 @@
         ([res]
          (let [items (persistent! @items)
                f (comp
-                  (qualify as')
-                  (apply -join items kind kmap recur-kmap recur-xforms))]
+                  (as as')
+                  (-join items kind kmap))]
            (rf (reduce (f rf) res items))))
         ([res item]
          (vswap! items conj! item)
