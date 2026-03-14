@@ -241,11 +241,11 @@
              (r/join song {:artist/band-name :song/band-name})
              (r/project [:artist/band-name])))))
   (testing "It self joins"
-    (is (= #{{:genre/name "Metal", :parent/name "Popular"}
-             {:genre/name "New wave of British heavy metal", :parent/name "Metal"}}
+    (is (= #{{:genre/name "Metal", :parent.genre/name "Popular"}
+             {:genre/name "New wave of British heavy metal", :parent.genre/name "Metal"}}
            (|> genre
-             (r/join :self/parent {:parent/id :genre/parent-id})
-             (r/project [:genre/name :parent/name]))))))
+             (r/join :self/parent {:parent.genre/id :genre/parent-id})
+             (r/project [:genre/name :parent.genre/name]))))))
 
 (deftest left-join-test
   (testing "It joins rows"
@@ -510,25 +510,11 @@
              (r/aggregate {:album/names [r/set-agg :song/album-name]})
              (r/expand-seq :album/names))))))
 
-(deftest recursive-join
-  (testing "It joins recursively"
-    (is (= #{{:genre/name "New wave of British heavy metal" ::r/depth 0}
-             {:genre/name "Metal" ::r/depth 1}
-             {:genre/name "Popular" ::r/depth 2}}
-           (|> song
-             (r/join genre
-                     {:song/genre :genre/name}
-                     {:genre/parent-id :genre/id})
-             (r/project [:genre/name ::r/depth])))))
-  (testing "It self joins recursively"
-    (is (= #{{:genre/name "Popular" ::r/depth 1}
-             {:genre/name "Metal" ::r/depth 0}}
-           (|> genre
-             (r/join :self/root
-                     {:root/name :genre/name}
-                     {:genre/parent-id :genre/id})
-             (r/select (comp #{"Metal"} :root/name))
-             (r/project [::r/depth :genre/name]))))))
+(deftest qualify
+  (testing "It qualifies keys"
+    (is (= [{:qualify/a 1, :qualify/b 1, :qualify.pre-qualified/c 1}]
+           (|> [{:a 1 :b 1 :pre-qualified/c 1}]
+               (r/qualify :qualify))))))
 
 (deftest project-pred
   (testing "It projects selected keys"
@@ -634,207 +620,3 @@
                (r/as :tune)
                (r/project [:tune/band-name]))))))
 
-(comment
-  (require '[kixi.stats.core :as stats]
-           '[clojure.set :as s])
-
-  (let [n 1000]
-    (print "clojure.set ")
-    (time
-     (dotimes [_ n]
-       (-> song
-           (s/join artist {:song/band-name :artist/band-name})
-           (s/join song {:artist/band-name :song/band-name})
-           (s/project [:artist/band-name])
-           (->> (sort-by :artist/band-name)))
-       nil))
-    (print "relation|> ")
-    (time
-     (dotimes [_ n]
-       (|> song
-         (r/join artist {:song/band-name :artist/band-name})
-         (r/join song {:artist/band-name :song/band-name})
-         (r/project [:artist/band-name])
-         (r/sort-by :artist/band-name))
-       nil)))
-
-  (let [n 1000]
-    (print "Flat ")
-    (time
-     (dotimes [_ n]
-       (|> song
-           (r/join artist {:song/band-name :artist/band-name})
-           (r/join song {:artist/band-name :song/band-name})
-           (r/project [:artist/band-name])
-           (r/sort-by :artist/band-name))))
-    (print "Nested ")
-    (time
-     (dotimes [_ n]
-       (|> song
-           (r/join (r/|>eduction
-                    artist
-                    (r/join song {:artist/band-name :song/band-name}))
-                   {:song/band-name :artist/band-name})
-           (r/project [:artist/band-name])
-           (r/sort-by :artist/band-name)))))
-
-  (require '[criterium.core :as c])
-
-  (c/quick-bench
-   (-> song
-       (s/join artist {:song/band-name :artist/band-name})
-       (->> (sort-by :artist/band-name))
-       (s/project [:artist/band-name])))
-
-  (c/quick-bench
-   (|> song
-     (r/join artist {:song/band-name :artist/band-name})
-     (r/sort-by :artist/band-name)
-     (r/project [:artist/band-name])))
-
-  (|> song
-    (r/join artist {:song/band-name :artist/band-name})
-    (r/aggregate-over :song/album-name :album/artists [r/set-agg :artist/name])
-    (r/project-ns [:song :album])
-    (distinct)
-    (r/aggregate-over :song/album-name {:album/length [+ :song/length]
-                                        :album/tracks r/count}))
-
-  ;; Integrates wonderfully with kixi stats
-  (|> song
-    (r/aggregate-by :song/album-name {:album/song-length [r/simple-stats-agg :song/length]
-                                      :album/song-lengths [r/vec-agg :song/length]
-                                      :album/variance-length [stats/variance-p :song/length]})
-    (r/extend-kv :album/song-length)
-    (r/expand-seq :album/song-lengths))
-  
-  (|> song
-    (map :song/length)
-    (map inc))
-
-
-  nil)
-
-
-(def employee #{{:emp/name "Harry" :emp/id 3415 :emp/dept-name "Finance"}
-                {:emp/name "Sally" :emp/id 2241 :emp/dept-name "Sales"}
-                {:emp/name "George" :emp/id 3401 :emp/dept-name "Finance"}
-                {:emp/name "Harriet" :emp/id 2202 :emp/dept-name "Sales"}
-                {:emp/name "Mary" :emp/id 1257 :emp/dept-name "Human Resources"}})
-
-(def dept #{{:dept/name "Finance" :dept/manager "George"}
-            {:dept/name "Sales" :dept/manager "Harriet"}
-            {:dept/name "Production" :dept/manager "Charles"}})
-
-
-(comment
-  (|> employee
-      (r/join dept {:emp/dept-name :dept/name})
-      (r/project [:emp/name :dept/manager :emp/id])
-      (r/rename {:dept/manager :emp/manager})
-      (r/join :self/mgr {:mgr/name :emp/manager})
-      (r/project-pred (comp #{"name" "id"} name)))
-
-  (|> song
-      (r/project [:song/band-name])
-      (distinct)
-      (r/aggregate :count r/count))
-
-  (|> song
-      (r/aggregate :count r/count))
-
-  (r/rollup {} :a [:b :c] :d)
-
-  (|> song
-      (r/join (|> song (r/aggregate-by :song/name :song/avg-length [avg :song/length]))
-              {:song/name :song/name}))
-
-
-  (|> song
-      (r/as :tune))
-
-  nil)
-
-
-(def db {:genre (rmtm/relmap genre {:genre/parent-id :genre/id})})
-
-#_(rmtm/query db {:genre [:genre/id {:genre/parent-id [:genre/name]}]})
-
-(def db {:song (rmtm/relmap song {:song/album-name :album/name} :song/name)
-         :artist (rmtm/relmap artist {} :album/name)})
-
-#_(rmtm/query db {:song [:song/name {:song/band-name [:artist/name]}]})
-
-(def db {:emp (rmtm/relmap employee {:emp/dept-name :dept/name} :emp/id)
-         :dept (rmtm/relmap dept {} :dept/name)})
-
-(rmtm/query db {:emp [:emp/name {:emp/dept-name [:dept/manager :dept/name]}]})
-
-
-(-> (rmtm/rmdb {:emp :emp/id :dept :dept/name} {:emp/dept-name :dept/name} employee dept)
-    (rmtm/query {:emp [:emp/name {:emp/dept-name [:dept/manager :dept/name]}]}))
-
-(-> (rmtm/rmdb {:emp :emp/id :dept :dept/name} {:emp/dept-name :dept/name} employee dept))
-
-#_(-> {:song song
-     :artist artist}
-    (rmtm/with :bulk
-                 :bulk/name
-                 rmtm/|>
-                 :song
-                 (take 2)
-                 (r/as :bulk))
-    (update :song r/|> (take 0)))
-
-(def db {:song song :artist artist})
-
-(-> db
-    #_(rmtm/with :bob
-               rmtm/from
-               :song
-               #_(rmtm/limit 2))
-    (rmtm/from :song))
-
-(-> (rmtm/rmdb {:song :song/name :genre :genre/id}
-               {;:song/genre :genre/name
-                :genre/parent-id :genre/id}
-               song
-               genre)
-    (rmtm/validate!)
-    #_(rmtm/query {:song [:song/name {:song/genre {:genre/parent-id [:genre/name]}}]}))
-
-
-(let [rel1 #{{:default/date :d1
-              :default/node-id :n1}
-             {:default/date :d2
-              :default/node-id :n1}}
-      rel2 #{{:date :d1
-              :node-id :n1}
-             #_{:date :d2
-                :node-id :n1}}]
-  (|> rel1
-   (r/left-join rel2 {:default/date :date
-                      :default/node-id :node-id
-                      :none :none})))
-
-(comment
-  (def song-artist
-    (r/|> song
-          (r/join artist {:song/band-name :artist/band-name})
-          (r/join genre {:song/genre :genre/name})))
-
-  (def empties (repeat 100 {}))
-
-  (time (apply r/merge empties))
-
-  (time
-   (dotimes [_ 100000]
-     (apply r/merge empties)))
-
-  (time
-   (dotimes [_ 100000]
-     (apply merge empties)))
-
-  (.capacity {:a 2})
-
-  nil)

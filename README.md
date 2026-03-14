@@ -104,7 +104,6 @@ Relation provides a rich set of operations
 * left-join
 * right-join
 * full-join
-* recursive-join
 * anti-join
 * aggregate-by
 * aggregate-over

@@ -146,60 +146,58 @@
            (reduce rf res (map #(merge item %) found))))))))
 
 (defn- -join
-  ([rel kind join-kmap]
-   (-join rel kind join-kmap nil))
-  ([rel kind join-kmap recur-kmap]
-   (fn [rf]
-     (let [join-idx (index rel (vals join-kmap))
-           join-ks (keys join-kmap)
-           used-idx-keys (when (#{:full :right} kind)
-                           (volatile! #{}))
-           rec-idx (index rel (vals recur-kmap))
-           rec-ks (keys recur-kmap)]
-       (fn
-         ([] (rf))
-         ([res]
-          (if (#{:full :right} kind)
-            (let [yitems (->> (apply core/dissoc join-idx @used-idx-keys)
-                              (vals)
-                              (apply concat))]
-              (rf (reduce rf res yitems)))
-            (rf res)))
-         ([res item]
-          (let [join-idx-key (set/rename-keys (select-keys item join-ks) join-kmap)
-                join-found (get join-idx join-idx-key)]
-            (if join-found
-              (do
-                (when (#{:full :right} kind)
-                  (vswap! used-idx-keys conj join-idx-key))
-                (if (seq recur-kmap)
-                  (let [level 0]
-                    (loop [res (reduce rf res (map #(merge item % {::depth level}) join-found))
-                           level (inc level)
-                           items join-found]
-                      (if (seq items)
-                        (let [idx-key (set/rename-keys (select-keys (first items) rec-ks) recur-kmap)
-                              found (get rec-idx idx-key)]
-                          (recur
-                           (reduce rf res (map #(merge item % {::depth level}) found))
-                           (inc level)
-                           (into (rest items) found)))
-                        res)))
-                  (reduce rf res (map #(merge item %) join-found))))
-              (if (#{:full :outer :right} kind)
-                (rf res item)
-                res)))))))))
+  [rel kind join-kmap]
+  (fn [rf]
+    (let [
+          join-idx (index rel (vals join-kmap))
+          join-ks (keys join-kmap)
+          used-idx-keys (when (#{:full :right} kind)
+                          (volatile! #{}))]
+      (fn
+        ([] (rf))
+        ([res]
+         (if (#{:full :right} kind)
+           (let [yitems (->> (apply core/dissoc join-idx @used-idx-keys)
+                             (vals)
+                             (apply concat))]
+             (rf (reduce rf res yitems)))
+           (rf res)))
+        ([res item]
+         (let [join-idx-key (set/rename-keys (select-keys item join-ks) join-kmap)
+               join-found (get join-idx join-idx-key)]
+           (if join-found
+             (do
+               (when (#{:full :right} kind)
+                 (vswap! used-idx-keys conj join-idx-key))
+               (reduce rf res (map #(merge item %) join-found)))
+             (if (#{:full :outer :right} kind)
+               (rf res item)
+               res))))))))
 
 (defn as
   "Qualifies all keys in row with given namespace.
 
   namespace must be a keyword, string or symbol"
-  [namespace]
-  (let [namespace (name namespace)]
-    (map (fn [row]
-           (update-keys row #(keyword namespace (name %)))))))
+  ([]
+   (map (fn [row]
+          (update-keys row (comp keyword name)))))
 
-(defn- self-join [as' kmap recur-kmap kind]
+  ([namespace]
+   (let [namespace (name namespace)]
+     (map (fn [row]
+            (update-keys row #(keyword namespace (name %))))))))
+
+(defn qualify
+  [prefix]
+  (map (fn [row]
+         (update-keys row
+                      (fn [k]
+                        (let [cur-ns (namespace k)
+                              new-ns (cond-> (name prefix)
+                                       cur-ns (str "." cur-ns))]
+                          (keyword new-ns (name k))))))))
+
+(defn- self-join [as' kmap kind]
   (fn [rf]
     (let [items (volatile! (transient []))]
       (fn
@@ -207,8 +205,8 @@
         ([res]
          (let [items (persistent! @items)
                f (comp
-                  (as as')
-                  (-join items kind kmap recur-kmap))]
+                  (qualify as')
+                  (apply -join items kind kmap recur-kmap recur-xforms))]
            (rf (reduce (f rf) res items))))
         ([res item]
          (vswap! items conj! item)
@@ -225,34 +223,26 @@
   ([rel]
    (-natural-join rel))
   ([rel kmap]
-   (join rel kmap nil :inner))
-  ([rel kmap recur-kmap]
-   (join rel kmap recur-kmap :inner))
-  ([rel kmap recur-kmap kind]
+   (join rel kmap :inner))
+  ([rel kmap kind]
    (if (and (qualified-keyword? rel)
           (= "self" (namespace rel)))
-     (self-join (name rel) kmap recur-kmap kind)
-     (-join rel kind kmap recur-kmap))))
+     (self-join (name rel) kmap kind)
+     (-join rel kind kmap))))
 
 (defn left-join
   "Same as join but always keeps all unmatched rows."
-  ([rel kmap]
-   (left-join rel kmap nil))
-  ([rel kmap recur-kmap]
-   (join rel kmap recur-kmap :outer)))
+  [rel kmap]
+  (join rel kmap :outer))
 
 (defn right-join
   "Same as join but always keep all rows in rel"
-  ([rel kmap]
-   (right-join rel kmap nil))
-  ([rel kmap recur-kmap]
-   (join rel kmap recur-kmap :right)))
+  [rel kmap]
+  (join rel kmap :right))
 
 (defn full-join
-  ([rel kmap]
-   (full-join rel kmap nil :full))
-  ([rel kmap recur-kmap kind]
-   (join rel kmap recur-kmap kind)))
+  [rel kmap]
+  (join rel kmap :full))
 
 (defn anti-join [rel kmap]
   (comp
