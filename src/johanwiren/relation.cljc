@@ -4,7 +4,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set])
-  (:refer-clojure :exclude [assoc count dissoc merge update-keys extend update sort-by]))
+  (:refer-clojure :exclude [assoc count dissoc merge update-keys update-vals extend update sort-by]))
 
 (defn |>
   [relation & xforms]
@@ -68,6 +68,11 @@
   "Updates keys, like clojure.core/update-keys"
   [f]
   (map #(core/update-keys % f)))
+
+(defn update-vals
+  "Updates vals, like clojure.core/update-vals"
+  [f]
+  (map #(core/update-vals % f)))
 
 ;;
 
@@ -138,7 +143,7 @@
            (transient {})
            rel)
    persistent!
-   (update-vals persistent!)))
+   (core/update-vals persistent!)))
 
 (defn- -natural-join
   [rel]
@@ -440,7 +445,7 @@
   ([relmap]
    (-> relmap
        persistent!
-       (update-vals persistent!)))
+       (core/update-vals persistent!)))
   ([relmap row]
    (let [by-ns
          (-> (reduce-kv
@@ -451,7 +456,7 @@
               (transient {})
               row)
              (persistent!)
-             (update-vals persistent!))]
+             (core/update-vals persistent!))]
      (reduce-kv
       (fn [relmap ns row]
         (assoc! relmap

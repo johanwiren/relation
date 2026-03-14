@@ -627,3 +627,12 @@
                   (take 1)
                   (r/update-keys (comp str name))
                   (map (comp set keys)))))))
+
+(deftest update-vals-test
+  (testing "It updates vals"
+    (is (= #{#{"mac" "1999"}}
+           (|>set apple-sales
+                  (take 1)
+                  (r/project [:category :price])
+                  (r/update-vals str)
+                  (map (comp set vals)))))))
