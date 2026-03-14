@@ -630,8 +630,9 @@
 
 (deftest update-vals-test
   (testing "It updates vals"
-    (is (= #{#{"mac" "1999"}}
+    (is (= #{#{"mac" "799"}}
            (|>set apple-sales
+                  (r/sort-by :price)
                   (take 1)
                   (r/project [:category :price])
                   (r/update-vals str)
