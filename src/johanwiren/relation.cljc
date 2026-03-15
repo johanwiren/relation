@@ -4,7 +4,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set])
-  (:refer-clojure :exclude [assoc count dissoc update-keys update-vals extend update sort-by]))
+  (:refer-clojure :exclude [assoc count dissoc update-keys update-vals extend update sort-by when]))
 
 (defn |>
   [relation & xforms]
@@ -76,7 +76,7 @@
 
 ;;
 
-(defn when|>
+(defn when
   "Optionally applies xforms for rows where (pred row) is true"
   [pred & xforms]
   (let [xf (apply comp xforms)]
@@ -150,7 +150,7 @@
         ([] (rf))
         ([res] (rf res))
         ([res item]
-         (when (empty? @ks)
+         (core/when (empty? @ks)
            (let [ks' (set/intersection (set (keys (first rel))) (set (keys item)))]
              (vreset! ks ks')
              (vreset! idx (index rel ks'))))
@@ -163,7 +163,7 @@
     (let [
           join-idx (index rel (vals join-kmap))
           join-ks (keys join-kmap)
-          used-idx-keys (when (#{:full :right} kind)
+          used-idx-keys (core/when (#{:full :right} kind)
                           (volatile! #{}))]
       (fn
         ([] (rf))
@@ -179,7 +179,7 @@
                join-found (get join-idx join-idx-key)]
            (if join-found
              (do
-               (when (#{:full :right} kind)
+               (core/when (#{:full :right} kind)
                  (vswap! used-idx-keys conj join-idx-key))
                (reduce rf res (map #(into item %) join-found)))
              (if (#{:full :outer :right} kind)

@@ -638,7 +638,7 @@
                   (r/update-vals str)
                   (map (comp set vals)))))))
 
-(deftest when|>-test
+(deftest when-test
   (testing "It optionally applies xforms"
     (is (= #{#:song{:name "Run to the Hills"}
              #:song{:name "Gangland"}
@@ -662,11 +662,11 @@
              #:song{:name "Charlotte the Harlot"}
              #:song{:name "The Number of the Beast"}}
            (|> song
-               (r/when|> (fn [{:song/keys [length]}]
-                           (< 400 length))
-                         (r/assoc :song/long? true)
-                         (r/assoc :album/has-long-song? true)
-                         (r/when|> (fn [{:song/keys [length]}]
-                                     (< 425 length))
-                                   (r/assoc :song/super-long? true)))
+               (r/when (fn [{:song/keys [length]}]
+                         (< 400 length))
+                 (r/assoc :song/long? true)
+                 (r/assoc :album/has-long-song? true)
+                 (r/when (fn [{:song/keys [length]}]
+                           (< 425 length))
+                   (r/assoc :song/super-long? true)))
                (r/project [:song/name :song/long? :song/super-long? :album/has-long-song?]))))))
