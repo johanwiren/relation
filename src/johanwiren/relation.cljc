@@ -4,7 +4,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set])
-  (:refer-clojure :exclude [assoc count dissoc merge update-keys update-vals extend update sort-by]))
+  (:refer-clojure :exclude [assoc count dissoc update-keys update-vals extend update sort-by]))
 
 (defn |>
   [relation & xforms]
@@ -85,19 +85,6 @@
              (first (transduce xf conj [] [row]))
              row)))))
 
-(defn merge
-  "Faster version of clojure.core/merge."
-  ([] nil)
-  ([m] m)
-  ([m1 m2]
-   (persistent!
-    (reduce-kv (fn [m k v]
-                 (assoc! m k v))
-               (transient m1)
-               m2)))
-  ([m1 m2 & more]
-   (reduce merge (merge m1 m2) more)))
-
 (defn select
   "Selects rows for which (pred row) returns true."
   [pred]
@@ -168,7 +155,7 @@
              (vreset! ks ks')
              (vreset! idx (index rel ks'))))
          (let [found (get @idx (select-keys item @ks))]
-           (reduce rf res (map #(merge item %) found))))))))
+           (reduce rf res (map #(into item %) found))))))))
 
 (defn- -join
   [rel kind join-kmap]
@@ -194,7 +181,7 @@
              (do
                (when (#{:full :right} kind)
                  (vswap! used-idx-keys conj join-idx-key))
-               (reduce rf res (map #(merge item %) join-found)))
+               (reduce rf res (map #(into item %) join-found)))
              (if (#{:full :outer :right} kind)
                (rf res item)
                res))))))))
@@ -301,7 +288,7 @@
                                  ;; Invoke the completing function
                                  (agg-fn res))
                                (get agg-by-map (::by row))
-                               (merge (core/dissoc row ::by) by))]))
+                               (into (core/dissoc row ::by) by))]))
         aggs))
 
 (defn aggregate-by
@@ -394,7 +381,7 @@
                   (fn [res row]
                     (->> (reduce
                           (fn [row ks]
-                            (merge row (get completed-aggs (select-keys row ks))))
+                            (into row (get completed-aggs (select-keys row ks))))
                           row
                           expanded-ks)
                          (rf res)))
@@ -535,7 +522,7 @@
   => #{{:min-val 1, :max-val 2, :count 2, :avg-val 3/2, :sum-val 3}}"
   [k]
   (let [ns (namespace k)]
-    (map #(merge
+    (map #(into
            (core/dissoc % k)
            (core/update-keys
             (k %)
@@ -555,7 +542,7 @@
   => #{{:key :val}}"
   [k]
   (let [ns (namespace k)]
-    (map #(merge
+    (map #(into
            (core/dissoc % k)
            (core/update-keys
             (k %)
