@@ -76,7 +76,7 @@
 
 ;;
 
-(defn when
+(defn cond|>
   "Optionally applies xforms for rows where (pred row) is true"
   [pred & xforms]
   (let [xf (apply comp xforms)]
