@@ -637,3 +637,36 @@
                   (r/project [:category :price])
                   (r/update-vals str)
                   (map (comp set vals)))))))
+
+(deftest when|>-test
+  (testing "It optionally applies xforms"
+    (is (= #{#:song{:name "Run to the Hills"}
+             #:song{:name "Gangland"}
+             #:song{:name "Invaders"}
+             #:song{:name "22 Acacia Avenue"}
+             #:song{:name "Transylvania"}
+             #:song{:name "Children of the Damned"}
+             #:song{:name "Iron Maiden"}
+             #:song{:name "Strange World"}
+             #:song{:name "Prowler"}
+             #:song{:name "Remember Tomorrow"}
+             #:song{:name "The Prisoner"}
+             {:album/has-long-song? true,
+              :song/long? true,
+              :song/name "Phantom Of the Opera"}
+             #:song{:name "Running Free"}
+             {:album/has-long-song? true,
+              :song/long? true,
+              :song/name "Hallowed Be Thy Name",
+              :song/super-long? true}
+             #:song{:name "Charlotte the Harlot"}
+             #:song{:name "The Number of the Beast"}}
+           (|> song
+               (r/when|> (fn [{:song/keys [length]}]
+                           (< 400 length))
+                         (r/assoc :song/long? true)
+                         (r/assoc :album/has-long-song? true)
+                         (r/when|> (fn [{:song/keys [length]}]
+                                     (< 425 length))
+                                   (r/assoc :song/super-long? true)))
+               (r/project [:song/name :song/long? :song/super-long? :album/has-long-song?]))))))

@@ -76,6 +76,15 @@
 
 ;;
 
+(defn when|>
+  "Optionally applies xforms for rows where (pred row) is true"
+  [pred & xforms]
+  (let [xf (apply comp xforms)]
+    (map (fn [row]
+           (if (pred row)
+             (first (transduce xf conj [] [row]))
+             row)))))
+
 (defn merge
   "Faster version of clojure.core/merge."
   ([] nil)
