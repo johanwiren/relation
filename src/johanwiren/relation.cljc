@@ -80,10 +80,10 @@
   "Optionally applies xforms for rows where (pred row) is true"
   [pred & xforms]
   (let [xf (apply comp xforms)]
-    (map (fn [row]
-           (if (pred row)
-             (first (transduce xf conj [] [row]))
-             row)))))
+    (mapcat (fn [row]
+              (if (pred row)
+                (eduction xf [row])
+                [row])))))
 
 (defn select
   "Selects rows for which (pred row) returns true."

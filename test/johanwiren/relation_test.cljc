@@ -648,7 +648,6 @@
              #:song{:name "Children of the Damned"}
              #:song{:name "Iron Maiden"}
              #:song{:name "Strange World"}
-             #:song{:name "Prowler"}
              #:song{:name "Remember Tomorrow"}
              #:song{:name "The Prisoner"}
              {:album/has-long-song? true,
@@ -660,8 +659,16 @@
               :song/name "Hallowed Be Thy Name",
               :song/super-long? true}
              #:song{:name "Charlotte the Harlot"}
-             #:song{:name "The Number of the Beast"}}
+             #:song{:name "The Number of the Beast"}
+             #:song{:name \P}
+             #:song{:name \r}
+             #:song{:name \o}
+             #:song{:name \w}
+             #:song{:name \l}
+             #:song{:name \e}}
            (|> song
+               (r/cond|> (comp #{"Prowler"} :song/name)
+                         (r/expand-seq :song/name))
                (r/cond|> (fn [{:song/keys [length]}]
                            (< 400 length))
                  (r/assoc :song/long? true)
