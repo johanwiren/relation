@@ -76,14 +76,21 @@
 
 ;;
 
+(defn- if-xf [pred true-xf false-xf]
+  (fn [rf]
+    (let [true-xf (true-xf rf)
+          false-xf (false-xf rf)]
+      (fn
+        ([res] (-> res true-xf transient false-xf transient rf))
+        ([res item]
+         (if (pred item)
+           (true-xf res item)
+           (false-xf res item)))))))
+
 (defn cond|>
   "Optionally applies xforms for rows where (pred row) is true"
   [pred & xforms]
-  (let [xf (apply comp xforms)]
-    (mapcat (fn [row]
-              (if (pred row)
-                (eduction xf [row])
-                [row])))))
+  (if-xf pred (apply comp xforms) (map identity)))
 
 (defn select
   "Selects rows for which (pred row) returns true."
@@ -95,7 +102,6 @@
   "Renames keys on all rows using kmap."
   [kmap]
   (map #(set/rename-keys % kmap)))
-
 
 (defn extend
   "Associates k to each row with the value of (f row)"
