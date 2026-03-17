@@ -76,22 +76,6 @@
 
 ;;
 
-(defn- if-xf [pred true-xf false-xf]
-  (fn [rf]
-    (let [true-xf (true-xf rf)
-          false-xf (false-xf rf)]
-      (fn
-        ([res] (-> res true-xf transient false-xf transient rf))
-        ([res item]
-         (if (pred item)
-           (true-xf res item)
-           (false-xf res item)))))))
-
-(defn cond|>
-  "Optionally applies xforms for rows where (pred row) is true"
-  [pred & xforms]
-  (if-xf pred (apply comp xforms) (map identity)))
-
 (defn select
   "Selects rows for which (pred row) returns true."
   [pred]
