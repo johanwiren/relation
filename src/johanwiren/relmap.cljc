@@ -30,7 +30,7 @@
   [pk-map rm-a rm-b]
   (-join pk-map :full rm-a rm-b))
 
-(defn row-diff [ks row-a row-b]
+(defn row-diff [row-a row-b ks]
   (let [attrs (into (set (keys row-a))
                     (keys row-b))]
     (into {}
@@ -41,7 +41,7 @@
                     [attr (get row-b attr)])))
           attrs)))
 
-(defn rel-diff [ks rel-a rel-b]
+(defn rel-diff [rel-a rel-b ks]
   (let [a-idx (rel/index rel-a ks)
         b-idx (rel/index rel-b ks)
         idx-ks (into (set (keys a-idx))
@@ -54,7 +54,7 @@
                                   (and a-row
                                        b-row
                                        (not= a-row b-row))
-                                  [:updated (row-diff ks a-row b-row)]
+                                  [:updated (row-diff a-row b-row ks)]
 
                                   (and (not a-row)
                                        b-row)
@@ -76,13 +76,16 @@
      (persistent!)
      (update-vals persistent!))))
 
-(defn diff [pk-map rm-a rm-b]
+(defn diff [rm-a rm-b pk-map]
   (let [relvars (into (set (keys rm-a))
                       (keys rm-b))]
     (reduce (fn [diff relvar]
-              (let [rel-diff (rel-diff (get pk-map relvar)
-                                     (get rm-a relvar)
-                                     (get rm-b relvar))]
+              (let [rel-diff (rel-diff (get rm-a relvar)
+                                       (get rm-b relvar)
+                                       (get pk-map relvar))]
                 (assoc diff relvar rel-diff)))
             {}
             relvars)))
+
+(defn normalize [relmap]
+  (rel/|>normalized (apply concat (vals relmap))))
