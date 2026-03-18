@@ -4,9 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [johanwiren.relation-test :as rel-test]
    [johanwiren.relmap :as sut]
-   [johanwiren.relation :as r]
-   #?(:clj [clojure.test :as t]
-      :cljs [cljs.test :as t :include-macros true])))
+   [johanwiren.relation :as r]))
 
 
 (def relmap

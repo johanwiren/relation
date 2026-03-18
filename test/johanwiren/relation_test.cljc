@@ -1,7 +1,6 @@
 (ns johanwiren.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]])
-  #?(:cljs (:require-macros johanwiren.relation)))
+            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]]))
 
 (def genre #{{:genre/id 0
               :genre/name "New wave of British heavy metal"
