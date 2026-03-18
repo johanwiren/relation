@@ -584,7 +584,14 @@
             :artist artist}
            (r/|>normalized
                song
-             (r/join artist {}))))))
+             (r/join artist {})))))
+  (testing "It normalizes whan called as regular function"
+    (is (= {:song song
+            :artist artist}
+           (r/normalize
+            (r/|> song
+                  (r/join artist {})))))))
+
 
 (deftest |>-test
   (testing "It composes clojure.core transducers"

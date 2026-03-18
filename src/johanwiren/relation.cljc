@@ -50,7 +50,7 @@
 
 (defn |>normalized
   [relation & forms]
-  (transduce (reduce comp forms) normalize relation))
+  (transduce (reduce comp forms) (normalize) relation))
 
 ;; Relational versions of clojre.core functions
 
@@ -423,33 +423,40 @@
           (vswap! items conj! item)
           res))))))
 
-(defn- normalize
+(defn normalize
   "Normalizes a relation.
-  Returns a map of namespace to distinct maps with keys for only that namespace."
+  Returns a map of namespace to distinct maps with keys for only that namespace.
+
+  Takes a relation as argument.
+  Returns a transducer when no relation is provided."
   ([]
-   (transient {}))
-  ([relmap]
-   (-> relmap
-       persistent!
-       (core/update-vals persistent!)))
-  ([relmap row]
-   (let [by-ns
-         (-> (reduce-kv
-              (fn [m k v]
-                (let [nspace (keyword (namespace k))]
-                  (assoc! m nspace
-                   (assoc! (get m nspace (transient {})) k v))))
-              (transient {})
-              row)
-             (persistent!)
-             (core/update-vals persistent!))]
-     (reduce-kv
-      (fn [relmap ns row]
-        (assoc! relmap
-                ns
-                (conj! (get relmap ns (transient #{})) row)))
-      relmap
-      by-ns))))
+   (fn
+     ([]
+      (transient {}))
+     ([relmap]
+      (-> relmap
+          persistent!
+          (core/update-vals persistent!)))
+     ([relmap row]
+      (let [by-ns
+            (-> (reduce-kv
+                 (fn [m k v]
+                   (let [nspace (keyword (namespace k))]
+                     (assoc! m nspace
+                             (assoc! (get m nspace (transient {})) k v))))
+                 (transient {})
+                 row)
+                (persistent!)
+                (core/update-vals persistent!))]
+        (reduce-kv
+         (fn [relmap ns row]
+           (assoc! relmap
+                   ns
+                   (conj! (get relmap ns (transient #{})) row)))
+         relmap
+         by-ns)))))
+  ([relation]
+   (transduce (map identity) (normalize) relation)))
 
 (defn union
   "Distinct union with rel."
