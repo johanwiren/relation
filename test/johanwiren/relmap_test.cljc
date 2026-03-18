@@ -24,9 +24,9 @@
                        :removed #{}
                        :updated #{}}}
              (sut/diff
-               pk-map
                relmap
-               (update relmap :artist r/|> (r/union addition)))))))
+               (update relmap :artist r/|> (r/union addition))
+               pk-map)))))
 
   (testing "removed"
     (let [removal #{{:artist/name "Nicko McBrain" :artist/band-name "Iron Maiden"}}]
@@ -34,9 +34,9 @@
                        :added #{}
                        :updated #{}}}
              (sut/diff
-               pk-map
                relmap
-               (update relmap :artist r/|> (remove removal)))))))
+               (update relmap :artist r/|> (remove removal))
+               pk-map)))))
 
   (testing "updated"
     (is (= {:artist
@@ -51,6 +51,6 @@
              :added #{}
              :removed #{}}}
            (sut/diff
-             pk-map
              relmap
-             (update relmap :artist r/|> (r/update :artist/band-name str/upper-case)))))))
+             (update relmap :artist r/|> (r/update :artist/band-name str/upper-case))
+             pk-map)))))
