@@ -224,10 +224,6 @@
 (defn join
   "Joins with relation rel using the corresponding attributes in kmap.
 
-  When recur-kmap is specified, for each found entry in rel, recursively joins
-  rel on corresponding attributes in recur-kmap.
-  Adds :johanwiren.relation/depth to joined entries.
-
   Keys in rel will be merged into the matched row with rel taking precedence."
   ([rel]
    (-natural-join rel))
