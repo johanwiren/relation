@@ -644,3 +644,22 @@
                   (r/update-vals str)
                   (map (comp set vals)))))))
 
+(deftest in|>-test
+  (testing "It nests"
+    (is (= [{:lv1 '({:lv2 #{{:val false}}})}]
+           (|> [{:lv1 '({:lv2 #{{:val 1}}})}]
+               (r/in|> [:lv1 :lv2]
+                       (r/update :val inc)
+                       (r/update :val odd?))))))
+  (testing "It nests in different levels"
+    (is (= [{:lv1 '({:lv2 #{{:val false
+                             :deeper? true}}
+                     :deep? true})}]
+           (|> [{:lv1 '({:lv2 #{{:val 1}}})}]
+               (r/in|> [:lv1]
+                       (r/assoc :deep? true)
+                       (r/in|> [:lv2]
+                               (r/assoc :deeper? true)
+                               (r/update :val inc)
+                               (r/update :val odd?))))))))
+

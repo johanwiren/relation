@@ -419,6 +419,12 @@
           (vswap! items conj! item)
           res))))))
 
+(defn in|>
+  [path & xforms]
+  (if (next path)
+    (update (first path) |> (apply in|> (rest path) xforms))
+    (update (first path) |> (reduce comp xforms))))
+
 (defn normalize
   "Normalizes a relation.
   Returns a map of namespace to distinct maps with keys for only that namespace.
