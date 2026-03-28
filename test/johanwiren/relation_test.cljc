@@ -1,6 +1,7 @@
 (ns johanwiren.relation-test
   (:require [clojure.test :refer [deftest is testing]]
-            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]]))
+            [johanwiren.relation :as r :refer [|>set |>seq |>vec |> |>first |>last]])
+  #?(:cljs (:require-macros [johanwiren.relation])))
 
 (def genre #{{:genre/id 0
               :genre/name "New wave of British heavy metal"
@@ -663,3 +664,36 @@
                                (r/update :val inc)
                                (r/update :val odd?))))))))
 
+
+(deftest with-parents|>-test
+  (testing "It nests with bindings"
+    (is (= [{:level :parent
+             :children
+             '({:level :child
+                :children
+                #{{:levels [:parent :child]}}})}]
+           (|> [{:level :parent
+                 :children
+                 '({:level :child
+                    :children
+                    #{{}}})}]
+                (r/with-parents|> [root :children
+                                   lv-1 :children]
+                  (r/assoc :levels [(:level root) (:level lv-1)]))))))
+
+  (testing "It nests with bindings on different levels"
+    (is (= [{:level :parent
+             :children
+             '({:level :child
+                :xf :xf
+                :children
+                #{{:levels [:parent :child]}}})}]
+           (|> [{:level :parent
+                 :children
+                 '({:level :child
+                    :children
+                    #{{}}})}]
+                (r/with-parents|> [root :children]
+                  (r/assoc :xf :xf)
+                  (r/with-parents|> [lv-1 :children]
+                    (r/assoc :levels [(:level root) (:level lv-1)]))))))))

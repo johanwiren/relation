@@ -4,7 +4,7 @@
    #?(:clj [clojure.core :as core]
       :cljs [cljs.core :as core])
    [clojure.set :as set])
-  (:refer-clojure :exclude [assoc count dissoc update-keys update-vals extend update sort-by when]))
+  (:refer-clojure :exclude [assoc count dissoc update-keys update-vals extend update sort-by]))
 
 (defn |>
   [relation & xforms]
@@ -424,6 +424,39 @@
   (if (next path)
     (update (first path) |> (apply in|> (rest path) xforms))
     (update (first path) |> (reduce comp xforms))))
+
+
+(defmacro with-parents|>
+  "Descends into a nested structure with parent bindings.
+
+  Accepts a binding vector with pairs of symbol and keyword.
+
+  For each pair in binding vector binds current row to symbol
+  and descends into nested rows as extracted by given keyword from
+  current row, repeating the bind and descent until binding pairs
+  are exhausted.
+
+  Applies xform(s) at deepest level"
+
+  {:clj-kondo/lint-as 'clojure.core/let}
+  [bindings & xforms]
+  (when (not (vector? bindings))
+    (throw (ex-info "Bindings must be a vector" {})))
+  (when (not (even? (core/count bindings)))
+    (throw (ex-info "Bindings must have even number of elements" {})))
+
+  (let [pairs (partition 2 bindings)]
+    (when (not (every? #(and (symbol? (first %)) (keyword? (second %))) pairs))
+      (throw (ex-info "Each pair must be [symbol :keyword]" {})))
+
+    (letfn [(generate [[[child-sym child-path] & pairs]]
+              `(map (fn [~child-sym]
+                      (core/update ~child-sym
+                                   ~child-path
+                                   ~@(if (seq pairs)
+                                       (list `|> (generate pairs))
+                                       (cons `|> xforms))))))]
+      (generate pairs))))
 
 (defn normalize
   "Normalizes a relation.
