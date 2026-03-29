@@ -426,8 +426,8 @@
     (update (first path) |> (reduce comp xforms))))
 
 
-(defmacro with-parents|>
-  "Descends into a nested structure with parent bindings.
+(defmacro with-row-in|>
+  "Descends into a nested structure while binding current row.
 
   Accepts a binding vector with pairs of symbol and keyword.
 

@@ -665,7 +665,7 @@
                                (r/update :val odd?))))))))
 
 
-(deftest with-parents|>-test
+(deftest with-row-in|>-test
   (testing "It nests with bindings"
     (is (= [{:level :parent
              :children
@@ -677,8 +677,8 @@
                  '({:level :child
                     :children
                     #{{}}})}]
-                (r/with-parents|> [root :children
-                                   lv-1 :children]
+                (r/with-row-in|> [root :children
+                               lv-1 :children]
                   (r/assoc :levels [(:level root) (:level lv-1)]))))))
 
   (testing "It nests with bindings on different levels"
@@ -693,7 +693,8 @@
                  '({:level :child
                     :children
                     #{{}}})}]
-                (r/with-parents|> [root :children]
+                (r/with-row-in|> [root :children]
                   (r/assoc :xf :xf)
-                  (r/with-parents|> [lv-1 :children]
+                  (r/with-row-in|> [lv-1 :children]
                     (r/assoc :levels [(:level root) (:level lv-1)]))))))))
+
