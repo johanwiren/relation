@@ -146,7 +146,13 @@
   (is (= [1 2]
          (-> (range 10)
              (|> (take 2))
-             (|> (map inc))))))
+             (|> (map inc)))))
+  (testing "It preserves order of lists"
+    (is (= '(:a :b)
+           (|> (list :a :b)))))
+  (testing "It preserves order of sequences"
+    (is (= '(:a :b)
+           (|> (seq (list :a :b)))))))
 
 (deftest aggregate-test
   (testing "It aggregates into a relation"

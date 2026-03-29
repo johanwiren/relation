@@ -8,7 +8,10 @@
 
 (defn |>
   [relation & xforms]
-  (into (empty relation) (reduce comp xforms) relation))
+  (if (or (list? relation)
+          (seq? relation))
+    (sequence (reduce comp xforms) relation)
+    (into (empty relation) (reduce comp xforms) relation)))
 
 (defn |>seq
   [relation & xforms]
