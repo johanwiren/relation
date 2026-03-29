@@ -684,7 +684,7 @@
                     :children
                     #{{}}})}]
                 (r/with-row-in|> [root :children
-                               lv-1 :children]
+                                  lv-1 :children]
                   (r/assoc :levels [(:level root) (:level lv-1)]))))))
 
   (testing "It nests with bindings on different levels"
