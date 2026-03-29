@@ -1,0 +1,2 @@
+{:linters {:clojure-lsp/unused-public-var {:exclude #{johanwiren.relation}}}
+ :lint-as {johanwiren.relation/with-parents|> clojure.core/let}}
