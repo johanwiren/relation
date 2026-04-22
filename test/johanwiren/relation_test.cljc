@@ -138,11 +138,11 @@
   (is (seq? (|>seq [:a])))
   (is (nil? (|>first [])))
   (is (= 1 (|>first (range)
-                    (r/select odd?))))
+                    (filter odd?))))
   (is (nil? (|>last [])))
   (is (= 9 (|>last (range)
                    (take 10)
-                   (r/select odd?))))
+                   (filter odd?))))
   (is (= [1 2]
          (-> (range 10)
              (|> (take 2))
@@ -166,28 +166,20 @@
 
 (deftest project-test
   (testing "It projects keys"
-    (is (= #{#:artist{:band-name "Iron Maiden"}
-             #:artist{:band-name "The White Stripes"}}
-           (|> artist
-               (r/project [:artist/band-name])))))
+    (is (= [#:artist{:band-name "Iron Maiden"}
+            #:artist{:band-name "The White Stripes"}]
+           (|>vec (vec artist)
+                  (r/project [:artist/band-name])))))
   (testing "Distinct"
     (is (= #{{:count 1}}
            (|> song
                (r/project [:song/band-name])
-               (distinct)
                (r/aggregate :count r/count)))))
   (testing "SQL-like projection"
     (is (= #{{:count 16}}
            (|> song
-               (r/project [:song/band-name])
+               (r/select [:song/band-name])
                (r/aggregate :count r/count))))))
-
-(deftest select-test
-  (testing "It selects rows"
-    (is (= #{#:artist{:name "Jack White", :band-name "The White Stripes"}
-             #:artist{:name "Meg White", :band-name "The White Stripes"}}
-           (|> artist
-             (r/select (comp #{"The White Stripes"} :artist/band-name)))))))
 
 (deftest join-test
   (testing "Cross join"
@@ -233,7 +225,7 @@
              #:artist{:name "Adrian Smith"}
              #:artist{:name "Nicko McBrain"}}
            (|> song
-             (r/select (comp #(< 400 %) :song/length))
+             (filter (comp #(< 400 %) :song/length))
              (r/join artist {:song/band-name :artist/band-name})
              (r/project [:artist/name])))))
   (testing "It omits unmatched right rows"
@@ -401,13 +393,13 @@
                                    :category {:category/avg-price [avg :price]}
                                    [:category :model] {:model/avg-price [avg :price]}}))]
              (|> apple-sales
-                 (r/join (|> aggs (r/select (comp nil? :model)))
+                 (r/join (|> aggs (filter (comp nil? :model)))
                          {:category :category})
-                 (r/join (|> aggs (r/select :model))
+                 (r/join (|> aggs (filter :model))
                          {:category :category, :model :model})
-                 (r/join (|> aggs (r/select (complement (some-fn :model :category))))
+                 (r/join (|> aggs (filter (complement (some-fn :model :category))))
                          {})
-                 (r/select (comp #{"iPhone Eclipse"} :model))))))))
+                 (filter (comp #{"iPhone Eclipse"} :model))))))))
 
 (deftest stats-test
   (testing "It builds stats"
@@ -466,7 +458,7 @@
             (r/aggregate-over {[] {:global/avg-price [avg :price]}
                                :category {:category/avg-price [avg :price]}
                                [:category :model] {:model/avg-price [avg :price]}})
-            (r/select (comp #{"iPhone Eclipse"} :model))
+            (filter (comp #{"iPhone Eclipse"} :model))
             (r/project-ns [:global :model :category]))))))
 
 (deftest aggs-test
@@ -559,7 +551,7 @@
                (fn [{:song/keys [length]
                      :album/keys [avg-song-length]}]
                  (< avg-song-length length)))
-             (r/select :song/longer-than-avg?)
+             (filter :song/longer-than-avg?)
              (r/project [:song/name]))))))
 
 (deftest update-test
@@ -618,7 +610,7 @@
                        (r/project [:song/name]))
                (update :artist
                        |>
-                       (r/select (comp #{"The White Stripes"} :artist/band-name))
+                       (filter (comp #{"The White Stripes"} :artist/band-name))
                        (r/project [:artist/name])))))))
 
 (deftest rollup-test

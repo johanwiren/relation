@@ -79,12 +79,6 @@
 
 ;;
 
-(defn select
-  "Selects rows for which (pred row) returns true."
-  [pred]
-  (filter pred))
-
-
 (defn rename
   "Renames keys on all rows using kmap."
   [kmap]
@@ -107,20 +101,47 @@
   [k f & args]
   (map #(apply core/update % k f args)))
 
-(defn project-pred
+(defn select-pred
   "Keeps only keys matching pred for each row."
   [pred]
   (map #(into {} (filter (comp pred key)) %)))
 
-(defn project-ns
+(defn project-pred
+  "Keeps only keys matching pred for each row.
+
+   Keeps distinct rows"
+  [pred]
+  (comp
+   (select-pred pred)
+   (distinct)))
+
+(defn select-ns
   "Keep only keys with matching namespace(s) for each row."
   [namespaces]
-  (project-pred (comp (into #{} (map name) namespaces) namespace)))
+  (select-pred (comp (into #{} (map name) namespaces) namespace)))
 
-(defn project
+(defn project-ns
+  "Keep only keys with matching namespace(s) for each row.
+
+   Keeps distinct rows"
+  [namespaces]
+  (comp
+   (select-ns namespaces)
+   (distinct)))
+
+(defn select
   "Keeps only keys ks for each row."
   [ks]
   (map #(select-keys % ks)))
+
+(defn project
+  "Keeps only keys ks for each row.
+
+   Keeps distinct rows"
+  [ks]
+  (comp
+   (select ks)
+   (distinct)))
 
 (defn index
   "Returns a map of distinct values for ks to distinct rows for those values."
@@ -255,7 +276,7 @@
 (defn anti-join [rel kmap]
   (comp
    (left-join rel kmap)
-   (select (apply every-pred (map #(comp nil? %) (vals kmap))))))
+   (filter (apply every-pred (map #(comp nil? %) (vals kmap))))))
 
 (defn- -aggs-reducer [row]
   (fn [aggs ks aggs-map]
