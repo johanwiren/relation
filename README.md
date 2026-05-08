@@ -14,7 +14,7 @@ The `|>` function is the preferred method to interact with this library, it give
 
 ```clojure
 (|> relation-a
-    (r/select (comp pos? :a/val))
+    (filter (comp pos? :a/val))
     (r/join relation-b {:a/b-id :b/id})
     (r/aggregate :a/sum [+ :a/val]))
 ```
@@ -27,7 +27,7 @@ Since it is a function it can be used anywhere a function is needed:
            {:person/name "Bob" :person/yob 1967}]}
  (update :person
          |>
-         (r/select (comp (partial < 1970) :person/yob))
+         (filter (comp (partial < 1970) :person/yob))
          (r/project [:person/name])))
 ```
 
@@ -42,7 +42,7 @@ Most things should be expressable together with transducers in *clojure.core* an
 ```clojure
 (|>first
  [{:age 42} {:age 19}]
- (r/select (comp (partial < 20) :age))
+ (filter (comp (partial < 20) :age))
  ;; Note that we can add normal transducers from clojure.core
  (map :age))
 
@@ -93,12 +93,12 @@ Joining
 
 Relation provides a rich set of operations
 
-* select
 * assoc
 * dissoc
 * rename
 * extend
 * update
+* select
 * project
 * join (including self-join)
 * left-join
