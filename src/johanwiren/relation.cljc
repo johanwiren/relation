@@ -515,7 +515,7 @@
          relmap
          by-ns)))))
   ([relation]
-   (transduce (map identity) (normalize) relation)))
+   (transduce identity (normalize) relation)))
 
 (defn union
   "Distinct union with rel."
