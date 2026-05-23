@@ -696,3 +696,10 @@
                   (r/with-row-in|> [lv-1 :children]
                     (r/assoc :levels [(:level root) (:level lv-1)]))))))))
 
+(deftest helpers-test
+  (testing "omit-nil"
+    (is (= [1 3]
+           (reduce
+            (r/omit-nil conj)
+            []
+            [1 nil 3])))))
