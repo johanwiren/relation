@@ -484,21 +484,28 @@
 
 (deftest extend-kv-test
   (testing "It extends maps"
-    (is (= #{#:song{:album-name "Iron Maiden",
-                    :min 202,
-                    :max 422,
-                    :count 8,
-                    :avg #?(:clj 2259/8 :cljs 282.375),
-                    :sum 2259}
-             #:song{:album-name "The Number of the Beast",
-                    :min 200,
-                    :max 428,
-                    :count 8,
-                    :avg #?(:clj 2351/8 :cljs 293.875),
-                    :sum 2351}}
+    (is (= #{{:song/album-name "The Number of the Beast",          
+             :min 200,
+             :max 428,
+             :count 8,
+             :avg #?(:clj 2351/8 :cljs 293.875),
+             :sum 2351}
+            {:song/album-name "Iron Maiden",
+             :min 202,
+             :max 422,
+             :count 8,
+             :avg #?(:clj 2259/8 :cljs 282.375),
+             :sum 2259}}
            (|> song
              (r/aggregate-by :song/album-name {:song/length [r/simple-stats-agg :song/length]})
-             (r/extend-kv :song/length))))))
+             (r/extend-kv :song/length)))))
+  (testing "Isomorphic with collapse-kv"
+    (let [rel (|> song
+                  (r/aggregate-by :song/album-name {:song/length [r/simple-stats-agg :song/length]}))]
+      (is (= rel
+             (|> rel
+                 (r/extend-kv :song/length)
+                 (r/collapse-kv :song/length [:min :max :count :avg :sum])))))))
 
 (deftest expand-seq
   (testing "It expands seqs"
@@ -695,6 +702,19 @@
                   (r/assoc :xf :xf)
                   (r/with-row-in|> [lv-1 :children]
                     (r/assoc :levels [(:level root) (:level lv-1)]))))))))
+
+(deftest collapse-kv-test
+  (testing "It collapses"
+    (is (= #{{:person {:name "Alice" :age 30 :city "NYC"}
+              :not-collapsed :key}}
+           (|> #{{:name "Alice" :age 30 :city "NYC" :not-collapsed :key}}
+               (r/collapse-kv :person [:name :age :city])))))
+  (testing "Isomorphic with extend-kv"
+    (let [rel #{{:name "Alice" :age 30 :city "NYC" :not-collapsed :key}}]
+      (is (= rel
+             (|> rel
+              (r/collapse-kv :person [:name :age :city])
+              (r/extend-kv :person)))))))
 
 (deftest helpers-test
   (testing "omit-nil"

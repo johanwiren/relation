@@ -584,12 +584,27 @@
   (let [ns (namespace k)]
     (map #(into
            (core/dissoc % k)
-           (core/update-keys
-            (k %)
-            (fn [k']
-              (if (namespace k')
-                k'
-                (keyword ns (name k')))))))))
+           (get % k)))))
+
+(defn collapse-kv
+  "Collapses multiple flat keys into a nested map structure.
+
+   Takes a destination key and either a vector of keys to collapse or
+   a predicate function to identify keys to include in the collapse.
+
+   Example:
+   (|> #{{:name \"Alice\" :age 30 :city \"NYC\"}}
+     (collapse-kv :person [:name :age :city]))
+
+   => #{{:person {:name \"Alice\" :age 30 :city \"NYC\"}}}"
+  [k keys-or-key-pred]
+  (let [key-pred (if (vector? keys-or-key-pred)
+                   (set keys-or-key-pred)
+                   keys-or-key-pred)]
+    (map (fn [row]
+           (let [collapsed (into {} (filter (comp key-pred key) row))]
+             (-> (apply core/dissoc row (keys collapsed))
+                 (core/update k merge collapsed)))))))
 
 (defn expand-seq
   "Expands a sequence in a relation into separate rows.
